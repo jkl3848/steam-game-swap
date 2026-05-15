@@ -1,0 +1,20 @@
+node_modules
+dist
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+coverage
+.turbo
+.vite
+
+# TypeScript / build artifacts
+*.tsbuildinfo
+apps/web/src/**/*.vue.js
+apps/web/src/**/*.js
+!apps/web/vite.config.ts
+
+# IDE
+.idea
+.vscode

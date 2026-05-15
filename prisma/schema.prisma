@@ -1,0 +1,137 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SwapStatus {
+  draft
+  open
+  locked
+  matched
+  completed
+  cancelled
+}
+
+model User {
+  id            String   @id @default(cuid())
+  discordId     String   @unique @map("discord_id")
+  discordTag    String?  @map("discord_tag")
+  displayName   String?  @map("display_name")
+  avatarUrl     String?  @map("avatar_url")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  createdSwaps  Swap[]   @relation("SwapCreator")
+
+  @@map("users")
+}
+
+model Swap {
+  id              String     @id @default(cuid())
+  code            String     @unique
+  title           String
+  rulesText       String?    @map("rules_text")
+  startDate       DateTime   @map("start_date")
+  giftDeadline    DateTime   @map("gift_deadline")
+  priceMin        Int?       @map("price_min")
+  priceMax        Int?       @map("price_max")
+  status          SwapStatus @default(open)
+  autoMatch       Boolean    @default(true) @map("auto_match")
+  creatorUserId   String     @map("creator_user_id")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+
+  creator         User             @relation("SwapCreator", fields: [creatorUserId], references: [id])
+  participants    SwapParticipant[]
+  blackoutPairs   BlackoutPair[]
+  assignments     Assignment[]
+
+  @@map("swaps")
+}
+
+model SwapParticipant {
+  id              String   @id @default(cuid())
+  swapId          String   @map("swap_id")
+  firstName       String   @map("first_name")
+  steamUsername   String   @map("steam_username")
+  steamId         String?  @map("steam_id")
+  discordUserId   String?  @map("discord_user_id")
+  discordTag      String?  @map("discord_tag")
+  secretTokenHash String   @map("secret_token_hash")
+  joinedAt        DateTime @default(now()) @map("joined_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  swap            Swap           @relation(fields: [swapId], references: [id], onDelete: Cascade)
+  wishlistItems   WishlistItem[]
+  blackoutsAsA    BlackoutPair[] @relation("BlackoutA")
+  blackoutsAsB    BlackoutPair[] @relation("BlackoutB")
+  assignmentsAsGiver   Assignment[] @relation("Giver")
+  assignmentsAsReceiver Assignment[] @relation("Receiver")
+
+  @@unique([swapId, discordUserId])
+  @@map("swap_participants")
+}
+
+model WishlistItem {
+  id            String   @id @default(cuid())
+  participantId String   @map("participant_id")
+  steamAppId    Int      @map("steam_app_id")
+  name          String
+  storeUrl      String   @map("store_url")
+  priceHint     String?  @map("price_hint")
+  sortOrder     Int      @default(0) @map("sort_order")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  participant   SwapParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@unique([participantId, steamAppId])
+  @@map("wishlist_items")
+}
+
+model BlackoutPair {
+  id              String   @id @default(cuid())
+  swapId          String   @map("swap_id")
+  participantAId  String   @map("participant_a_id")
+  participantBId  String   @map("participant_b_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  swap            Swap            @relation(fields: [swapId], references: [id], onDelete: Cascade)
+  participantA    SwapParticipant @relation("BlackoutA", fields: [participantAId], references: [id], onDelete: Cascade)
+  participantB    SwapParticipant @relation("BlackoutB", fields: [participantBId], references: [id], onDelete: Cascade)
+
+  @@unique([swapId, participantAId, participantBId])
+  @@map("blackout_pairs")
+}
+
+model Assignment {
+  id           String   @id @default(cuid())
+  swapId       String   @map("swap_id")
+  giverId      String   @map("giver_id")
+  receiverId   String   @map("receiver_id")
+  sentAt       DateTime? @map("sent_at")
+  reminderSentAt DateTime? @map("reminder_sent_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  swap         Swap            @relation(fields: [swapId], references: [id], onDelete: Cascade)
+  giver        SwapParticipant @relation("Giver", fields: [giverId], references: [id], onDelete: Cascade)
+  receiver     SwapParticipant @relation("Receiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@unique([swapId, giverId])
+  @@unique([swapId, receiverId])
+  @@map("assignments")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  swapId    String?  @map("swap_id")
+  action    String
+  actorId   String?  @map("actor_id")
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("audit_logs")
+}

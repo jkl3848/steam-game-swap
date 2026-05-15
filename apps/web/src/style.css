@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Rajdhani", sans-serif;
+  --font-sans: "Inter", sans-serif;
+  --color-steam: #66c0f4;
+  --color-steam-dim: #1b2838;
+}
+
+body {
+  font-family: var(--font-sans);
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+@layer components {
+  .input {
+    @apply w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 focus:border-steam focus:outline-none;
+  }
+  .input-sm {
+    @apply px-2 py-1 rounded bg-slate-900 border border-white/10 text-sm;
+  }
+}
