@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { prisma } from "../db.js";
+import { findUserById, upsertUser } from "../db/users.js";
+import { createOAuthState, consumeOAuthState } from "../db/oauth-states.js";
 import { config, assertDiscordOAuth } from "../config.js";
 import {
   COOKIE_CREATOR,
@@ -8,27 +9,23 @@ import {
 } from "../lib/session.js";
 
 const DISCORD_API = "https://discord.com/api";
-const oauthStates = new Map<
-  string,
-  { type: "creator" | "participant_link"; swapCode?: string }
->();
 
 export async function authApiRoutes(app: FastifyInstance) {
   app.get("/auth/me", async (request) => {
     if (!request.creatorSession) {
       return { user: null };
     }
-    const user = await prisma.user.findUnique({
-      where: { id: request.creatorSession.userId },
-      select: {
-        id: true,
-        discordId: true,
-        discordTag: true,
-        displayName: true,
-        avatarUrl: true,
+    const user = await findUserById(request.creatorSession.userId);
+    if (!user) return { user: null };
+    return {
+      user: {
+        id: user.id,
+        discordId: user.discordId,
+        discordTag: user.discordTag,
+        displayName: user.displayName,
+        avatarUrl: user.avatarUrl,
       },
-    });
-    return { user };
+    };
   });
 
   app.post("/auth/logout", async (_request, reply) => {
@@ -61,8 +58,7 @@ export async function oauthRoutes(app: FastifyInstance) {
 
 export async function handleDiscordLogin(_request: FastifyRequest, reply: FastifyReply) {
   assertDiscordOAuth();
-  const state = crypto.randomUUID();
-  oauthStates.set(state, { type: "creator" });
+  const state = await createOAuthState("creator");
 
   const params = new URLSearchParams({
     client_id: config.discord.clientId,
@@ -78,8 +74,7 @@ export async function handleDiscordLogin(_request: FastifyRequest, reply: Fastif
 export async function handleDiscordLink(request: FastifyRequest, reply: FastifyReply) {
   assertDiscordOAuth();
   const { code } = request.params as { code: string };
-  const state = crypto.randomUUID();
-  oauthStates.set(state, { type: "participant_link", swapCode: code.toUpperCase() });
+  const state = await createOAuthState("participant_link", code.toUpperCase());
 
   const params = new URLSearchParams({
     client_id: config.discord.clientId,
@@ -99,8 +94,7 @@ export async function handleDiscordCallback(request: FastifyRequest, reply: Fast
     return reply.redirect(`${config.webOrigin}/?error=oauth`);
   }
 
-  const stored = oauthStates.get(state);
-  oauthStates.delete(state);
+  const stored = await consumeOAuthState(state);
   if (!stored) {
     return reply.redirect(`${config.webOrigin}/?error=state`);
   }
@@ -148,19 +142,11 @@ export async function handleDiscordCallback(request: FastifyRequest, reply: Fast
     );
   }
 
-  const user = await prisma.user.upsert({
-    where: { discordId: discordUser.id },
-    create: {
-      discordId: discordUser.id,
-      discordTag: tag,
-      displayName: tag,
-      avatarUrl,
-    },
-    update: {
-      discordTag: tag,
-      displayName: tag,
-      avatarUrl,
-    },
+  const user = await upsertUser({
+    discordId: discordUser.id,
+    discordTag: tag,
+    displayName: tag,
+    avatarUrl,
   });
 
   const jwt = await signSession({ type: "creator", userId: user.id });

@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { importWishlist, resolveSteamId, searchSteamStore } from "../services/steam.js";
 import { requireParticipantForSwap } from "../plugins/auth.js";
-import { prisma } from "../db.js";
+import { findSwapByCode } from "../db/swaps.js";
 
 export async function steamRoutes(app: FastifyInstance) {
   app.get("/steam/search", async (request) => {
@@ -15,9 +15,7 @@ export async function steamRoutes(app: FastifyInstance) {
 
   app.post("/swaps/:code/me/wishlist/import", async (request) => {
     const { code } = request.params as { code: string };
-    const swap = await prisma.swap.findUnique({
-      where: { code: code.toUpperCase() },
-    });
+    const swap = await findSwapByCode(code);
     if (!swap) {
       const err = new Error("Not found");
       (err as Error & { statusCode: number }).statusCode = 404;

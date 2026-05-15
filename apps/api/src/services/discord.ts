@@ -1,51 +1,46 @@
-import {
-  Client,
-  GatewayIntentBits,
-  Partials,
-  type MessageCreateOptions,
-} from "discord.js";
 import { config } from "../config.js";
 
-let client: Client | null = null;
-let loginPromise: Promise<void> | null = null;
-
-export function getDiscordClient(): Client | null {
-  if (!config.discord.botToken) return null;
-  if (!client) {
-    client = new Client({
-      intents: [GatewayIntentBits.Guilds, GatewayIntentBits.DirectMessages],
-      partials: [Partials.Channel],
-    });
-  }
-  return client;
-}
-
-export async function ensureBotReady(): Promise<Client | null> {
-  const bot = getDiscordClient();
-  if (!bot) return null;
-
-  if (bot.isReady()) return bot;
-
-  if (!loginPromise) {
-    loginPromise = bot.login(config.discord.botToken).then(() => undefined);
-  }
-  await loginPromise;
-  return bot;
-}
+const DISCORD_API = "https://discord.com/api/v10";
 
 export async function sendDirectMessage(
   discordUserId: string,
   content: string,
 ): Promise<boolean> {
-  const bot = await ensureBotReady();
-  if (!bot) {
+  if (!config.discord.botToken) {
     console.warn("Discord bot not configured; skipping DM");
     return false;
   }
 
   try {
-    const user = await bot.users.fetch(discordUserId);
-    await user.send({ content } satisfies MessageCreateOptions);
+    const channelRes = await fetch(`${DISCORD_API}/users/@me/channels`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bot ${config.discord.botToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ recipient_id: discordUserId }),
+    });
+
+    if (!channelRes.ok) {
+      console.error(`Failed to open DM channel: ${channelRes.status}`);
+      return false;
+    }
+
+    const channel = (await channelRes.json()) as { id: string };
+    const msgRes = await fetch(`${DISCORD_API}/channels/${channel.id}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bot ${config.discord.botToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ content }),
+    });
+
+    if (!msgRes.ok) {
+      console.error(`Failed to send DM: ${msgRes.status}`);
+      return false;
+    }
+
     return true;
   } catch (err) {
     console.error(`Failed to DM user ${discordUserId}:`, err);

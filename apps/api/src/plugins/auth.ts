@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
-import { prisma } from "../db.js";
+import { findSwapByCode, findParticipant } from "../db/swaps.js";
 import {
   COOKIE_CREATOR,
   COOKIE_PARTICIPANT,
@@ -52,9 +52,7 @@ export async function requireSwapCreator(
   swapCode: string,
 ) {
   const session = requireCreator(request);
-  const swap = await prisma.swap.findUnique({
-    where: { code: swapCode.toUpperCase() },
-  });
+  const swap = await findSwapByCode(swapCode);
   if (!swap) {
     const err = new Error("Swap not found");
     (err as Error & { statusCode: number }).statusCode = 404;
@@ -78,9 +76,7 @@ export async function requireParticipantForSwap(
     (err as Error & { statusCode: number }).statusCode = 401;
     throw err;
   }
-  const participant = await prisma.swapParticipant.findFirst({
-    where: { id: session.participantId, swapId },
-  });
+  const participant = await findParticipant(swapId, session.participantId);
   if (!participant) {
     const err = new Error("Participant not found");
     (err as Error & { statusCode: number }).statusCode = 404;

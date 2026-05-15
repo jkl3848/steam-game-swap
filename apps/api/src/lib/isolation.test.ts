@@ -5,14 +5,13 @@ import { buildApp } from "../app.js";
 
 /**
  * Integration-style test: participant session for swap A must not access swap B.
- * Skipped when DATABASE_URL is unset (CI without DB).
+ * Runs when Firestore emulator is available (set FIRESTORE_EMULATOR_HOST).
  */
-describe.skipIf(!process.env.DATABASE_URL)("swap isolation", () => {
+describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)("swap isolation", () => {
   it("rejects cross-swap participant access", async () => {
     const app = await buildApp();
     await app.ready();
 
-    // Without DB fixtures this is a placeholder for e2e with seeded data.
     const res = await app.inject({
       method: "GET",
       url: "/api/swaps/FAKECODE/me",

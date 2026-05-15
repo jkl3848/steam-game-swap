@@ -2,35 +2,29 @@
   "name": "steam-game-swap",
   "private": true,
   "scripts": {
-    "dev": "pnpm run --parallel dev:api dev:web",
+    "dev": "pnpm run --parallel dev:web dev:emulators",
     "dev:api": "pnpm --filter @steam-game-swap/api dev",
     "dev:web": "pnpm --filter @steam-game-swap/web dev",
+    "dev:emulators": "firebase emulators:start",
     "build": "pnpm run -r build",
-    "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev",
-    "db:push": "prisma db push",
-    "db:studio": "prisma studio",
-    "worker": "pnpm --filter @steam-game-swap/api worker",
+    "deploy": "firebase deploy",
+    "deploy:hosting": "firebase deploy --only hosting",
+    "deploy:functions": "firebase deploy --only functions",
     "test": "pnpm --filter @steam-game-swap/api test"
   },
   "devDependencies": {
-    "prisma": "^6.8.2",
+    "firebase-tools": "^14.9.0",
     "typescript": "^5.8.3"
-  },
-  "dependencies": {
-    "@prisma/client": "^6.8.2"
   },
   "engines": {
     "node": ">=20"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
-      "@prisma/client",
-      "@prisma/engines",
-      "prisma",
       "bcrypt",
       "esbuild",
-      "msgpackr-extract"
+      "protobufjs",
+      "re2"
     ]
   },
   "packageManager": "pnpm@10.4.1+sha512.c753b6c3ad7afa13af388fa6d808035a008e30ea9993f58c6663e2bc5ff21679aa834db094987129aa4d488b86df57f7b634981b2f827cdcacc698cc0cfb88af"
