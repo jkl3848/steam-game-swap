@@ -64,13 +64,16 @@ async function runAutoMatch() {
 
 async function runGiftReminders() {
   const now = new Date();
-  const reminderDate = new Date(now);
-  reminderDate.setDate(reminderDate.getDate() + config.giftReminderDaysBefore);
+  // Remind when deadline is in the future and at most N days away
+  // (equivalent to: now >= giftDeadline - N days).
+  const reminderWindowEnd = new Date(
+    now.getTime() + config.giftReminderDaysBefore * 86_400_000,
+  );
 
   const swaps = await prisma.swap.findMany({
     where: {
       status: "matched",
-      giftDeadline: { lte: reminderDate, gte: now },
+      giftDeadline: { gt: now, lte: reminderWindowEnd },
     },
     include: {
       assignments: {

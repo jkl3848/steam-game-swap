@@ -379,20 +379,28 @@ export async function swapRoutes(app: FastifyInstance) {
     }
 
     const participant = await requireParticipantForSwap(request, swap.id);
-    let steamId = participant.steamId;
+
+    const data: {
+      firstName?: string;
+      steamUsername?: string;
+      steamId?: string | null;
+      discordUserId?: string;
+      discordTag?: string | null;
+    } = {};
+
+    if (body.firstName) data.firstName = body.firstName;
+    if (body.discordUserId) data.discordUserId = body.discordUserId;
+    if (body.discordTag !== undefined) data.discordTag = body.discordTag;
+
     if (body.steamUsername) {
-      steamId = await resolveSteamId(body.steamUsername);
+      const trimmed = body.steamUsername.trim();
+      data.steamUsername = trimmed;
+      data.steamId = await resolveSteamId(trimmed);
     }
 
     const updated = await prisma.swapParticipant.update({
       where: { id: participant.id },
-      data: {
-        ...(body.firstName && { firstName: body.firstName }),
-        ...(body.steamUsername && { steamUsername: body.steamUsername.trim() }),
-        ...(body.discordUserId && { discordUserId: body.discordUserId }),
-        ...(body.discordTag !== undefined && { discordTag: body.discordTag }),
-        ...(steamId && { steamId }),
-      },
+      data,
     });
 
     return { participant: updated };
