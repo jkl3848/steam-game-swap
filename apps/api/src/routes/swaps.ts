@@ -26,11 +26,7 @@ import {
 } from "../db/swaps.js";
 import { config } from "../config.js";
 import { generateSwapCode } from "../lib/codes.js";
-import {
-  COOKIE_PARTICIPANT,
-  cookieOptions,
-  signSession,
-} from "../lib/session.js";
+import { setSessionCookie } from "../lib/session.js";
 import { generateSecretToken, hashToken, verifyToken } from "../lib/tokens.js";
 import {
   requireCreator,
@@ -242,12 +238,11 @@ export async function swapRoutes(app: FastifyInstance) {
       })),
     );
 
-    const jwt = await signSession({
+    await setSessionCookie(request, reply, {
       type: "participant",
       participantId: participant.id,
       swapId: swap.id,
     });
-    reply.setCookie(COOKIE_PARTICIPANT, jwt, cookieOptions());
 
     const participantUrl = `${config.webOrigin}/s/${swap.code}/me/${secretToken}`;
 
@@ -294,12 +289,11 @@ export async function swapRoutes(app: FastifyInstance) {
       throw err;
     }
 
-    const jwt = await signSession({
+    await setSessionCookie(request, reply, {
       type: "participant",
       participantId: matched.id,
       swapId: swap.id,
     });
-    reply.setCookie(COOKIE_PARTICIPANT, jwt, cookieOptions());
 
     return { ok: true, code: swap.code };
   });
