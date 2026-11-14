@@ -1,0 +1,31 @@
+{
+  "name": "steam-game-swap",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm run --parallel dev:web dev:emulators",
+    "dev:api": "pnpm --filter @steam-game-swap/api dev",
+    "dev:web": "pnpm --filter @steam-game-swap/web dev",
+    "dev:emulators": "firebase emulators:start",
+    "build": "pnpm run -r build",
+    "deploy": "firebase deploy",
+    "deploy:hosting": "firebase deploy --only hosting --project steam-game-swap-dev",
+    "deploy:functions": "firebase deploy --only functions",
+    "test": "pnpm --filter @steam-game-swap/api test"
+  },
+  "devDependencies": {
+    "firebase-tools": "^14.9.0",
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "bcrypt",
+      "esbuild",
+      "protobufjs",
+      "re2"
+    ]
+  },
+  "packageManager": "pnpm@10.4.1+sha512.c753b6c3ad7afa13af388fa6d808035a008e30ea9993f58c6663e2bc5ff21679aa834db094987129aa4d488b86df57f7b634981b2f827cdcacc698cc0cfb88af"
+}
