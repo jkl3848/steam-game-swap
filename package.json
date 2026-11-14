@@ -8,7 +8,7 @@
     "dev:emulators": "firebase emulators:start",
     "build": "pnpm run -r build",
     "deploy": "firebase deploy",
-    "deploy:hosting": "firebase deploy --only hosting",
+    "deploy:hosting": "firebase deploy --only hosting --project steam-game-swap-dev",
     "deploy:functions": "firebase deploy --only functions",
     "test": "pnpm --filter @steam-game-swap/api test"
   },

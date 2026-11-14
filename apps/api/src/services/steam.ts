@@ -59,14 +59,36 @@ export async function resolveSteamId(username: string): Promise<string | null> {
   return null;
 }
 
+export class SteamWishlistError extends Error {
+  constructor(
+    message: string,
+    public code: string,
+  ) {
+    super(message);
+  }
+}
+
 export async function importWishlist(steamId: string): Promise<SteamSearchResult[]> {
+  if (!config.steamApiKey) {
+    throw new SteamWishlistError(
+      "Steam Web API key is not configured. Search for games by name instead.",
+      "NO_API_KEY",
+    );
+  }
+
   const url = new URL(
     "https://api.steampowered.com/IWishlistService/GetWishlist/v1/",
   );
   url.searchParams.set("steamid", steamId);
+  url.searchParams.set("key", config.steamApiKey);
 
   const res = await fetch(url.toString());
-  if (!res.ok) return [];
+  if (!res.ok) {
+    throw new SteamWishlistError(
+      "Could not load Steam wishlist. Make sure the profile and wishlist are public.",
+      "WISHLIST_UNAVAILABLE",
+    );
+  }
 
   const data = (await res.json()) as {
     response?: {
@@ -75,6 +97,13 @@ export async function importWishlist(steamId: string): Promise<SteamSearchResult
   };
 
   const items = data.response?.items ?? [];
+  if (items.length === 0) {
+    throw new SteamWishlistError(
+      "Wishlist is empty or private. Add games with search instead.",
+      "EMPTY_OR_PRIVATE",
+    );
+  }
+
   const results: SteamSearchResult[] = [];
 
   for (const item of items.slice(0, 30)) {

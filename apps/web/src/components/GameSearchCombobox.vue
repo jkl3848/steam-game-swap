@@ -18,6 +18,7 @@ const emit = defineEmits<{ "update:modelValue": [WishlistGame[]] }>();
 const query = ref("");
 const results = ref<WishlistGame[]>([]);
 const loading = ref(false);
+const importError = ref("");
 let debounce: ReturnType<typeof setTimeout>;
 
 watch(query, (q) => {
@@ -56,8 +57,9 @@ function remove(appId: number) {
 async function importWishlist() {
   if (!props.swapCode) return;
   loading.value = true;
+  importError.value = "";
   try {
-    const res = await api.post<{ items: WishlistGame[]; error?: string }>(
+    const res = await api.post<{ items: WishlistGame[] }>(
       `/api/swaps/${props.swapCode}/me/wishlist/import`,
     );
     const merged = [...props.modelValue];
@@ -67,8 +69,9 @@ async function importWishlist() {
       }
     }
     emit("update:modelValue", merged.slice(0, 30));
-  } catch {
-    /* profile may be private */
+  } catch (e) {
+    importError.value =
+      e instanceof Error ? e.message : "Could not import wishlist. Search for games instead.";
   } finally {
     loading.value = false;
   }
@@ -94,6 +97,7 @@ async function importWishlist() {
         Import wishlist
       </button>
     </div>
+    <p v-if="importError" class="text-red-400 text-sm">{{ importError }}</p>
     <ul
       v-if="results.length"
       class="rounded-lg border border-white/10 bg-slate-900 divide-y divide-white/5 max-h-48 overflow-auto"

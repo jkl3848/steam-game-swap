@@ -435,13 +435,23 @@ export async function updateAssignmentReminder(swapId: string, assignmentId: str
 }
 
 export async function findSwapsForAutoMatch(now: Date): Promise<Swap[]> {
-  const q = await getDb()
-    .collection("swaps")
-    .where("status", "==", "open")
-    .where("autoMatch", "==", true)
-    .where("startDate", "<=", toTimestamp(now))
-    .get();
-  return q.docs.map((d) => docToSwap(d.id, d.data()));
+  const db = getDb();
+  const ts = toTimestamp(now);
+  const [openSnap, lockedSnap] = await Promise.all([
+    db
+      .collection("swaps")
+      .where("status", "==", "open")
+      .where("autoMatch", "==", true)
+      .where("startDate", "<=", ts)
+      .get(),
+    db
+      .collection("swaps")
+      .where("status", "==", "locked")
+      .where("autoMatch", "==", true)
+      .where("startDate", "<=", ts)
+      .get(),
+  ]);
+  return [...openSnap.docs, ...lockedSnap.docs].map((d) => docToSwap(d.id, d.data()));
 }
 
 export async function findSwapsForReminders(now: Date, windowEnd: Date): Promise<

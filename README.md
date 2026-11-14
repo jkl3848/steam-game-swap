@@ -61,17 +61,21 @@ Edit `.env` with your values. **Never commit `.env`** or service account JSON �
 | `API_PUBLIC_URL` | Yes | Public API base for OAuth (emulator or Hosting URL) |
 | `DISCORD_CLIENT_ID` | Yes | Discord application client ID |
 | `DISCORD_CLIENT_SECRET` | Yes | Discord application client secret |
-| `DISCORD_BOT_TOKEN` | Yes | Bot token (match + reminder DMs) |
-| `DISCORD_BOT_INVITE_URL` | Yes | Permanent invite to your hub server |
-| `STEAM_WEB_API_KEY` | No | Steam Web API key (profile resolve + wishlist import) |
+| `DISCORD_BOT_TOKEN` | Later | Bot token (match + reminder DMs) — optional until notifications |
+| `DISCORD_BOT_INVITE_URL` | Later | Permanent invite to your hub server |
+| `STEAM_WEB_API_KEY` | No | Steam Web API key (profile resolve + wishlist import). Store search works without it. |
 | `GIFT_REMINDER_DAYS_BEFORE` | No | Days before deadline to send reminders (default: 3) |
 
-### 3. Firebase project (when you have credentials)
+### 3. Firebase project
 
-1. Create a project in the [Firebase console](https://console.firebase.google.com/)
-2. Set the project ID in `.firebaserc` and `FIREBASE_PROJECT_ID`
-3. Download a service account key (Project settings → Service accounts) and set `GOOGLE_APPLICATION_CREDENTIALS` locally — **do not commit this file**
-4. For production secrets (`DISCORD_*`, `SESSION_SECRET`, etc.), use [Firebase Secret Manager](https://firebase.google.com/docs/functions/config-env)
+The repo is wired to **`steam-game-swap-dev`** (Firestore Native in `nam5`). Local `pnpm dev` uses the Emulator Suite and does not need a service account.
+
+To talk to the cloud project (not emulators):
+
+1. Open [Firebase console](https://console.firebase.google.com/project/steam-game-swap-dev)
+2. Optional local Admin SDK: Project settings → Service accounts → download JSON → `GOOGLE_APPLICATION_CREDENTIALS` — **do not commit this file**
+3. For production secrets (`DISCORD_*`, `SESSION_SECRET`, `STEAM_WEB_API_KEY`), use [Firebase Secret Manager](https://firebase.google.com/docs/functions/config-env)
+4. Enable the **Blaze** plan before deploying Cloud Functions or the hourly scheduler
 
 ### 4. Discord application
 
@@ -88,11 +92,13 @@ Edit `.env` with your values. **Never commit `.env`** or service account JSON �
 pnpm dev
 ```
 
-This runs the Firebase Emulator Suite (Firestore, Functions, Hosting UI) and the Vite dev server. The web app proxies `/api` and `/auth` to the Functions emulator.
+This runs the Firebase Emulator Suite (Firestore, Functions, Hosting emulator) and the Vite dev server. The web app proxies `/api` and `/auth` to the Functions emulator.
 
 - Web (Vite): http://localhost:5173  
 - Emulator UI: http://localhost:4000  
 - Functions: http://127.0.0.1:5001  
+- Hosting emulator: http://localhost:5002  
+- Firestore emulator: http://127.0.0.1:8080  
 
 To run the API alone without emulators (Fastify on port 3000):
 
@@ -104,14 +110,23 @@ Set `VITE_API_PROXY=http://localhost:3000` when running the web app against the 
 
 ### 6. Deploy
 
+Live site: **https://steam-game-swap-dev.web.app**
+
+Merges (and pushes) to `main` deploy Hosting via GitHub Actions (`.github/workflows/firebase-hosting-merge.yml`). The workflow authenticates with Workload Identity Federation — no service-account JSON in GitHub secrets.
+
+One-time GCP wiring (already run for this project):
+
 ```bash
-pnpm build
-firebase deploy
+node scripts/setup-github-deploy.mjs
 ```
 
-Or deploy separately: `pnpm deploy:hosting`, `pnpm deploy:functions`.
+Manual deploy from your machine:
 
-**Plan note:** Scheduled functions and outbound calls to Discord/Steam may require the Firebase **Blaze** billing plan.
+```bash
+pnpm deploy:hosting
+```
+
+`pnpm deploy` / `pnpm deploy:functions` need the Firebase **Blaze** plan (2nd-gen Cloud Functions). Hosting-only deploys work on Spark. The site rewrites `/api` and `/auth` to the `api` function, so those routes 404 until Functions are deployed.
 
 ## Project layout
 
@@ -136,7 +151,8 @@ firestore.indexes.json  Composite indexes for queries
 | `pnpm dev:web` | Vite only |
 | `pnpm dev:emulators` | Firebase Emulator Suite |
 | `pnpm build` | Build all packages |
-| `pnpm deploy` | Deploy Hosting + Functions |
+| `pnpm deploy` | Deploy Hosting + Functions (Functions need Blaze) |
+| `pnpm deploy:hosting` | Deploy Hosting only (used by GitHub Actions on `main`) |
 | `pnpm test` | Run API unit tests |
 
 ## Security

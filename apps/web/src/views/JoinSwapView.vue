@@ -141,7 +141,7 @@ function goToMyPage() {
 
       <div>
         <span class="text-sm text-slate-400 block mb-2">Wishlist</span>
-        <GameSearchCombobox v-model="wishlist" :swap-code="code" />
+        <GameSearchCombobox v-model="wishlist" />
       </div>
 
       <p v-if="error" class="text-red-400 text-sm">{{ error }}</p>

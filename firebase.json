@@ -1,5 +1,7 @@
 {
   "firestore": {
+    "database": "(default)",
+    "location": "nam5",
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
   },
@@ -14,23 +16,60 @@
         "firebase-debug.*.log",
         "src/**/*.test.ts"
       ],
-      "predeploy": ["pnpm --filter @steam-game-swap/api build"]
+      "predeploy": [
+        "pnpm --filter @steam-game-swap/api build"
+      ]
     }
   ],
   "hosting": {
+    "site": "steam-game-swap-dev",
     "public": "apps/web/dist",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "predeploy": ["pnpm --dir apps/web build"],
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "headers": [
+      {
+        "source": "/index.html",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      }
+    ],
     "rewrites": [
-      { "source": "/api/**", "function": "api" },
-      { "source": "/auth/**", "function": "api" },
-      { "source": "**", "destination": "/index.html" }
+      {
+        "source": "/api/**",
+        "function": "api"
+      },
+      {
+        "source": "/auth/**",
+        "function": "api"
+      },
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
     ]
   },
   "emulators": {
-    "functions": { "port": 5001 },
-    "firestore": { "port": 8080 },
-    "hosting": { "port": 5173 },
-    "ui": { "enabled": true, "port": 4000 },
+    "functions": {
+      "port": 5001
+    },
+    "firestore": {
+      "port": 8080
+    },
+    "hosting": {
+      "port": 5002
+    },
+    "ui": {
+      "enabled": true,
+      "port": 4000
+    },
     "singleProjectMode": true
   }
 }

@@ -1,0 +1,39 @@
+# Deploy the Vue SPA to Firebase Hosting when main is updated.
+# Uses GitHub OIDC (no JSON key in secrets). See scripts/setup-github-deploy.mjs.
+name: Deploy Firebase Hosting on merge
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/807163395777/locations/global/workloadIdentityPools/github-actions/providers/github
+          service_account: github-hosting@steam-game-swap-dev.iam.gserviceaccount.com
+
+      - name: Deploy Hosting
+        run: npx firebase-tools@latest deploy --only hosting --project steam-game-swap-dev --non-interactive
