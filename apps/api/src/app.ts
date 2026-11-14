@@ -25,7 +25,9 @@ export async function buildApp() {
     timeWindow: "1 minute",
   });
 
-  await app.register(authPlugin);
+  // Attach on the root instance so session hooks apply to /auth and /api routes.
+  // `app.register(authPlugin)` would encapsulate the hooks and silently skip them.
+  await authPlugin(app);
 
   app.setErrorHandler((error: Error & { statusCode?: number; code?: string }, _request, reply) => {
     const statusCode = error.statusCode ?? 500;

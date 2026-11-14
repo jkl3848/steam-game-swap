@@ -1,9 +1,8 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { findSwapByCode, findParticipant } from "../db/swaps.js";
 import {
-  COOKIE_CREATOR,
-  COOKIE_PARTICIPANT,
-  verifySession,
+  COOKIE_SESSION,
+  sessionsFromToken,
   type CreatorSession,
   type ParticipantSession,
 } from "../lib/session.js";
@@ -19,22 +18,14 @@ export async function authPlugin(app: FastifyInstance) {
   app.decorateRequest("creatorSession", undefined);
   app.decorateRequest("participantSession", undefined);
 
-  app.addHook("preHandler", async (request) => {
-    const creatorToken = request.cookies[COOKIE_CREATOR];
-    if (creatorToken) {
-      const session = await verifySession(creatorToken);
-      if (session?.type === "creator") {
-        request.creatorSession = session;
-      }
-    }
+  app.addHook("onSend", async (_request, reply) => {
+    reply.header("Cache-Control", "private");
+  });
 
-    const participantToken = request.cookies[COOKIE_PARTICIPANT];
-    if (participantToken) {
-      const session = await verifySession(participantToken);
-      if (session?.type === "participant") {
-        request.participantSession = session;
-      }
-    }
+  app.addHook("preHandler", async (request) => {
+    const { creator, participant } = await sessionsFromToken(request.cookies[COOKIE_SESSION]);
+    if (creator) request.creatorSession = creator;
+    if (participant) request.participantSession = participant;
   });
 }
 

@@ -2,11 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { findUserById, upsertUser } from "../db/users.js";
 import { createOAuthState, consumeOAuthState } from "../db/oauth-states.js";
 import { config, assertDiscordOAuth } from "../config.js";
-import {
-  COOKIE_CREATOR,
-  cookieOptions,
-  signSession,
-} from "../lib/session.js";
+import { clearSessionCookie, setSessionCookie } from "../lib/session.js";
 
 const DISCORD_API = "https://discord.com/api";
 
@@ -29,8 +25,7 @@ export async function authApiRoutes(app: FastifyInstance) {
   });
 
   app.post("/auth/logout", async (_request, reply) => {
-    reply.clearCookie(COOKIE_CREATOR, { path: "/" });
-    reply.clearCookie("sgs_participant", { path: "/" });
+    clearSessionCookie(reply);
     return { ok: true };
   });
 
@@ -149,8 +144,7 @@ export async function handleDiscordCallback(request: FastifyRequest, reply: Fast
     avatarUrl,
   });
 
-  const jwt = await signSession({ type: "creator", userId: user.id });
-  reply.setCookie(COOKIE_CREATOR, jwt, cookieOptions());
+  await setSessionCookie(request, reply, { type: "creator", userId: user.id });
 
   return reply.redirect(`${config.webOrigin}/dashboard`);
 }

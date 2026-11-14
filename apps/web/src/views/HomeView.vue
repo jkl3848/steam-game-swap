@@ -1,9 +1,23 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import { useRoute } from "vue-router";
 import { discordLoginUrl } from "../api";
 
 const route = useRoute();
-const showLogin = route.query.login === "1";
+
+const oauthErrors: Record<string, string> = {
+  oauth: "Discord did not finish authorizing. Please try signing in again.",
+  state: "That sign-in link expired. Please try signing in again.",
+  token: "Could not complete Discord sign-in. Please try again.",
+  user: "Could not load your Discord profile. Please try again.",
+};
+
+const notice = computed(() => {
+  const error = typeof route.query.error === "string" ? route.query.error : "";
+  if (error) return oauthErrors[error] ?? "Sign-in failed. Please try again.";
+  if (route.query.login === "1") return "Sign in with Discord to create a swap.";
+  return null;
+});
 </script>
 
 <template>
@@ -18,8 +32,8 @@ const showLogin = route.query.login === "1";
     </p>
   </section>
 
-  <div v-if="showLogin" class="mb-6 p-4 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-200 text-center">
-    Sign in with Discord to create a swap.
+  <div v-if="notice" class="mb-6 p-4 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-200 text-center">
+    {{ notice }}
   </div>
 
   <div class="grid md:grid-cols-2 gap-6 max-w-2xl mx-auto">
