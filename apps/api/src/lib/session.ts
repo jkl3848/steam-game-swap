@@ -115,13 +115,27 @@ export function clearCookieOptions() {
   };
 }
 
+export function sessionCookieFromRequest(request: FastifyRequest): string | undefined {
+  const parsed = request.cookies?.[COOKIE_SESSION];
+  if (parsed) return parsed;
+  const header = request.headers.cookie;
+  if (typeof header !== "string") return undefined;
+  const match = header.match(/(?:^|;\s*)__session=([^;]*)/);
+  if (!match?.[1]) return undefined;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return match[1];
+  }
+}
+
 export async function setSessionCookie(
   request: FastifyRequest,
   reply: FastifyReply,
   payload: SessionPayload,
 ) {
-  const token = await mergeSession(request.cookies[COOKIE_SESSION], payload);
-  reply.header("Cache-Control", "private");
+  const token = await mergeSession(sessionCookieFromRequest(request), payload);
+  reply.header("Cache-Control", "private, no-store");
   reply.setCookie(COOKIE_SESSION, token, cookieOptions());
 }
 

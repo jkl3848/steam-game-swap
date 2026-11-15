@@ -38,6 +38,23 @@ describe("auth plugin", () => {
     await app.close();
   });
 
+  it("keeps __session on a login redirect response", async () => {
+    const { setSessionCookie } = await import("./session.js");
+    const app = Fastify();
+    await app.register(cookie);
+    app.get("/go", async (request, reply) => {
+      await setSessionCookie(request, reply, { type: "creator", userId: "user-1" });
+      return reply.redirect("/dashboard");
+    });
+    const res = await app.inject({ method: "GET", url: "/go" });
+    const header = Array.isArray(res.headers["set-cookie"])
+      ? res.headers["set-cookie"].join("\n")
+      : String(res.headers["set-cookie"] ?? "");
+    expect(res.statusCode).toBe(302);
+    expect(header).toContain("__session=");
+    await app.close();
+  });
+
   it("writes login onto the __session cookie Firebase Hosting forwards", async () => {
     const { setSessionCookie } = await import("./session.js");
     const app = Fastify();
