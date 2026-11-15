@@ -48,6 +48,30 @@ describe("create swap request", () => {
     expect(parsed.priceMin).toBeUndefined();
     expect(parsed.priceMax).toBeUndefined();
   });
+
+  it("accepts numeric prices from the create form", () => {
+    const parsed = createSwapSchema.parse({
+      title: "Friday swap",
+      startDate: "2026-12-01",
+      giftDeadline: "2026-12-20",
+      priceMin: 15,
+      priceMax: 40,
+      autoMatch: true,
+    });
+    expect(parsed.priceMin).toBe(15);
+    expect(parsed.priceMax).toBe(40);
+  });
+
+  it("allows omitted prices", () => {
+    const parsed = createSwapSchema.parse({
+      title: "Friday swap",
+      startDate: "2026-12-01",
+      giftDeadline: "2026-12-20",
+    });
+    expect(parsed.priceMin).toBeUndefined();
+    expect(parsed.priceMax).toBeUndefined();
+    expect(parsed.autoMatch).toBe(true);
+  });
 });
 
 describe("dev participant tools", () => {

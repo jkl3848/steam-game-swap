@@ -10,7 +10,9 @@
     "deploy": "firebase deploy",
     "deploy:hosting": "firebase deploy --only hosting --project steam-game-swap-dev",
     "deploy:functions": "firebase deploy --only functions",
-    "test": "pnpm --filter @steam-game-swap/api test"
+    "test": "pnpm test:web && pnpm test:api",
+    "test:web": "pnpm --filter @steam-game-swap/web test",
+    "test:api": "firebase emulators:exec --only firestore --project demo-steam-game-swap \"pnpm --filter @steam-game-swap/api test\""
   },
   "devDependencies": {
     "firebase-tools": "^14.9.0",

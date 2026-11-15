@@ -2,6 +2,7 @@
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { api } from "../api";
+import { priceOrUndefined } from "../lib/price";
 
 const router = useRouter();
 const error = ref("");
@@ -11,18 +12,10 @@ const form = ref({
   rulesText: "",
   startDate: "",
   giftDeadline: "",
-  priceMin: "",
-  priceMax: "",
+  priceMin: "" as string | number,
+  priceMax: "" as string | number,
   autoMatch: true,
 });
-
-function priceOrUndefined(value: string): number | undefined {
-  const trimmed = value.trim();
-  if (!trimmed) return undefined;
-  const n = Number(trimmed);
-  if (!Number.isFinite(n)) return undefined;
-  return Math.trunc(n);
-}
 
 async function submit() {
   error.value = "";

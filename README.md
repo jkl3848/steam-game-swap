@@ -26,6 +26,7 @@ Anonymous gift swaps for Steam. Create a swap, share a code, collect wishlists, 
 - Node.js 20+
 - [pnpm](https://pnpm.io/) 10+
 - [Firebase CLI](https://firebase.google.com/docs/cli) (`firebase-tools`, included as a dev dependency)
+- Java 21+ on `PATH` (required by the Firestore emulator used for `pnpm test:api`)
 
 No Docker or local Postgres required.
 
@@ -156,7 +157,9 @@ firestore.indexes.json  Composite indexes for queries
 | `pnpm build` | Build all packages |
 | `pnpm deploy` | Deploy Hosting + Functions (Functions need Blaze) |
 | `pnpm deploy:hosting` | Deploy Hosting only (used by GitHub Actions on `main`) |
-| `pnpm test` | Run API unit tests |
+| `pnpm test` | Web unit tests + API tests (Firestore emulator) |
+| `pnpm test:web` | Vue / create-form unit tests |
+| `pnpm test:api` | API tests under `firebase emulators:exec` |
 
 ## Security
 

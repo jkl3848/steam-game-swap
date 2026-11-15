@@ -1,24 +1,90 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import Fastify from "fastify";
 import cookie from "@fastify/cookie";
 import { buildApp } from "../app.js";
+import { mergeSession } from "./session.js";
+import {
+  clearFirestoreEmulator,
+  cookieHeaderFromResponse,
+} from "../test/firestore-emulator.js";
 
 /**
  * Integration-style test: participant session for swap A must not access swap B.
  * Runs when Firestore emulator is available (set FIRESTORE_EMULATOR_HOST).
  */
 describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)("swap isolation", () => {
+  beforeEach(async () => {
+    await clearFirestoreEmulator();
+  });
+
+  it("returns 404 for an unknown swap code", async () => {
+    const app = await buildApp();
+    try {
+      const res = await app.inject({
+        method: "GET",
+        url: "/api/swaps/FAKECODE/me",
+      });
+      expect(res.statusCode).toBe(404);
+    } finally {
+      await app.close();
+    }
+  });
+
   it("rejects cross-swap participant access", async () => {
     const app = await buildApp();
-    await app.ready();
-
-    const res = await app.inject({
-      method: "GET",
-      url: "/api/swaps/FAKECODE/me",
+    const creatorToken = await mergeSession(undefined, {
+      type: "creator",
+      userId: "creator-iso",
     });
-    expect(res.statusCode).toBe(401);
+    const creatorCookie = `__session=${creatorToken}`;
 
-    await app.close();
+    try {
+      const swapA = await app.inject({
+        method: "POST",
+        url: "/api/swaps",
+        headers: { cookie: creatorCookie },
+        payload: {
+          title: "Swap A",
+          startDate: "2026-12-01",
+          giftDeadline: "2026-12-20",
+        },
+      });
+      const swapB = await app.inject({
+        method: "POST",
+        url: "/api/swaps",
+        headers: { cookie: creatorCookie },
+        payload: {
+          title: "Swap B",
+          startDate: "2026-12-01",
+          giftDeadline: "2026-12-20",
+        },
+      });
+      expect(swapA.statusCode).toBe(200);
+      expect(swapB.statusCode).toBe(200);
+      const codeA = swapA.json().swap.code as string;
+      const codeB = swapB.json().swap.code as string;
+
+      const joinA = await app.inject({
+        method: "POST",
+        url: `/api/swaps/${codeA}/join`,
+        payload: {
+          firstName: "Pat",
+          steamUsername: "pat_steam",
+          discordUserId: "dev:pat",
+        },
+      });
+      expect(joinA.statusCode).toBe(200);
+      const participantCookie = cookieHeaderFromResponse(joinA.headers["set-cookie"]);
+
+      const cross = await app.inject({
+        method: "GET",
+        url: `/api/swaps/${codeB}/me`,
+        headers: { cookie: participantCookie },
+      });
+      expect(cross.statusCode).toBe(401);
+    } finally {
+      await app.close();
+    }
   });
 });
 
