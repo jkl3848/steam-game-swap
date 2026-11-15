@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { findSwapByCode, findParticipant } from "../db/swaps.js";
 import {
-  COOKIE_SESSION,
+  sessionCookieFromRequest,
   sessionsFromToken,
   type CreatorSession,
   type ParticipantSession,
@@ -23,7 +23,7 @@ export async function authPlugin(app: FastifyInstance) {
   });
 
   app.addHook("preHandler", async (request) => {
-    const { creator, participant } = await sessionsFromToken(request.cookies[COOKIE_SESSION]);
+    const { creator, participant } = await sessionsFromToken(sessionCookieFromRequest(request));
     if (creator) request.creatorSession = creator;
     if (participant) request.participantSession = participant;
   });

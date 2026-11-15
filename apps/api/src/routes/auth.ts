@@ -146,5 +146,15 @@ export async function handleDiscordCallback(request: FastifyRequest, reply: Fast
 
   await setSessionCookie(request, reply, { type: "creator", userId: user.id });
 
-  return reply.redirect(`${config.webOrigin}/dashboard`);
+  // 200 HTML (not 302) so Firebase Hosting / the browser keep Set-Cookie
+  // on the Discord OAuth return trip.
+  return sendClientRedirect(reply, `${config.webOrigin}/dashboard`);
+}
+
+function sendClientRedirect(reply: FastifyReply, url: string) {
+  const safeUrl = JSON.stringify(url);
+  reply.header("Cache-Control", "private, no-store");
+  return reply.type("text/html; charset=utf-8").send(
+    `<!doctype html><html><head><meta http-equiv="refresh" content="0;url=${url.replace(/"/g, "")}"></head><body><script>location.replace(${safeUrl})</script><p><a href=${safeUrl}>Continue</a></p></body></html>`,
+  );
 }

@@ -11,6 +11,7 @@ import { swapRoutes } from "./routes/swaps.js";
 export async function buildApp() {
   const app = Fastify({
     logger: config.nodeEnv !== "test",
+    trustProxy: true,
   });
 
   await app.register(cors, {
