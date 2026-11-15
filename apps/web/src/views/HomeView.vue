@@ -23,7 +23,7 @@ const notice = computed(() => {
 <template>
   <section class="text-center space-y-8 py-12">
     <h1 class="font-display text-5xl md:text-6xl font-bold tracking-tight">
-      Secret Santa for
+      Gift swaps for
       <span class="text-steam">Steam</span> games
     </h1>
     <p class="text-slate-400 text-lg max-w-xl mx-auto">

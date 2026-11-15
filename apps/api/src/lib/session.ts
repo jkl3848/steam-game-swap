@@ -129,6 +129,23 @@ export function sessionCookieFromRequest(request: FastifyRequest): string | unde
   }
 }
 
+/** Keep the creator login and drop the participant half of the cookie. */
+export async function withoutParticipant(existingToken: string | undefined): Promise<string | null> {
+  const existing = existingToken ? await readCombinedSession(existingToken) : null;
+  if (!existing?.userId) return null;
+  return signCombinedSession({ userId: existing.userId });
+}
+
+export async function clearParticipantCookie(request: FastifyRequest, reply: FastifyReply) {
+  const token = await withoutParticipant(sessionCookieFromRequest(request));
+  reply.header("Cache-Control", "private, no-store");
+  if (!token) {
+    clearSessionCookie(reply);
+    return;
+  }
+  reply.setCookie(COOKIE_SESSION, token, cookieOptions());
+}
+
 export async function setSessionCookie(
   request: FastifyRequest,
   reply: FastifyReply,

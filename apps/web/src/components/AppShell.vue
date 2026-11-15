@@ -1,24 +1,43 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
+import { onMounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { api, discordLoginUrl } from "../api";
 
+const route = useRoute();
 const router = useRouter();
 const user = ref<{ displayName?: string; avatarUrl?: string } | null>(null);
+const actingAs = ref<{ firstName: string; code: string } | null>(null);
 
-onMounted(async () => {
+onMounted(loadMe);
+watch(() => route.fullPath, () => {
+  void loadMe();
+});
+
+async function loadMe() {
   try {
-    const res = await api.get<{ user: typeof user.value }>("/api/auth/me");
+    const res = await api.get<{
+      user: typeof user.value;
+      actingAs: { firstName: string; code: string } | null;
+    }>("/api/auth/me");
     user.value = res.user;
+    actingAs.value = res.actingAs;
   } catch {
     user.value = null;
+    actingAs.value = null;
   }
-});
+}
 
 async function logout() {
   await api.post("/api/auth/logout");
   user.value = null;
+  actingAs.value = null;
   router.push("/");
+}
+
+async function stopActing() {
+  await api.post("/api/auth/dev/stop-acting");
+  actingAs.value = null;
+  router.push(user.value ? "/dashboard" : "/");
 }
 </script>
 
@@ -51,11 +70,27 @@ async function logout() {
         </nav>
       </div>
     </header>
+    <div
+      v-if="actingAs"
+      class="bg-amber-500/10 border-b border-amber-500/30 text-amber-100 text-sm"
+    >
+      <div class="max-w-5xl mx-auto px-4 py-2 flex flex-wrap items-center justify-between gap-2">
+        <p>
+          Viewing the swap as <strong>{{ actingAs.firstName }}</strong>.
+          <template v-if="user">Your creator login is still active.</template>
+        </p>
+        <span class="flex items-center gap-3">
+          <RouterLink :to="`/s/${actingAs.code}/me`" class="underline">Their page</RouterLink>
+          <RouterLink :to="`/swap/${actingAs.code}/manage`" class="underline">Manage</RouterLink>
+          <button type="button" class="underline" @click="stopActing">Stop</button>
+        </span>
+      </div>
+    </div>
     <main class="flex-1 max-w-5xl w-full mx-auto px-4 py-8">
       <slot />
     </main>
     <footer class="border-t border-white/10 py-6 text-center text-slate-500 text-sm">
-      Secret Santa for Steam games · Your data stays scoped to each swap
+      Gift swaps for Steam games · Your data stays scoped to each swap
     </footer>
   </div>
 </template>

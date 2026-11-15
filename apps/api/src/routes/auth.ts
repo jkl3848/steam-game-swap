@@ -1,26 +1,45 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { findUserById, upsertUser } from "../db/users.js";
+import { findParticipant, findSwapById } from "../db/swaps.js";
 import { createOAuthState, consumeOAuthState } from "../db/oauth-states.js";
-import { config, assertDiscordOAuth } from "../config.js";
-import { clearSessionCookie, setSessionCookie } from "../lib/session.js";
+import { config, assertDevTools, assertDiscordOAuth, devToolsEnabled } from "../config.js";
+import { clearParticipantCookie, clearSessionCookie, setSessionCookie } from "../lib/session.js";
 
 const DISCORD_API = "https://discord.com/api";
 
 export async function authApiRoutes(app: FastifyInstance) {
   app.get("/auth/me", async (request) => {
-    if (!request.creatorSession) {
-      return { user: null };
+    const user = request.creatorSession
+      ? await findUserById(request.creatorSession.userId)
+      : null;
+
+    let actingAs: { firstName: string; code: string; participantId: string } | null = null;
+    const participantSession = request.participantSession;
+    if (devToolsEnabled() && participantSession && (user || participantSession)) {
+      const participant = await findParticipant(participantSession.swapId, participantSession.participantId);
+      const swap = participant ? await findSwapById(participantSession.swapId) : null;
+      const devParticipant = participant?.discordUserId?.startsWith("dev:") ?? false;
+      if (participant && swap && (user || devParticipant)) {
+        actingAs = {
+          firstName: participant.firstName,
+          code: swap.code,
+          participantId: participant.id,
+        };
+      }
     }
-    const user = await findUserById(request.creatorSession.userId);
-    if (!user) return { user: null };
+
     return {
-      user: {
-        id: user.id,
-        discordId: user.discordId,
-        discordTag: user.discordTag,
-        displayName: user.displayName,
-        avatarUrl: user.avatarUrl,
-      },
+      user: user
+        ? {
+            id: user.id,
+            discordId: user.discordId,
+            discordTag: user.discordTag,
+            displayName: user.displayName,
+            avatarUrl: user.avatarUrl,
+          }
+        : null,
+      devTools: devToolsEnabled(),
+      actingAs,
     };
   });
 
@@ -29,11 +48,18 @@ export async function authApiRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
+  app.post("/auth/dev/stop-acting", async (request, reply) => {
+    assertDevTools();
+    await clearParticipantCookie(request, reply);
+    return { ok: true };
+  });
+
   app.get("/auth/config", async () => ({
     discordClientId: config.discord.clientId || null,
     botInviteUrl: config.discord.botInviteUrl,
     webOrigin: config.webOrigin,
     apiUrl: config.apiPublicUrl,
+    devTools: devToolsEnabled(),
   }));
 }
 

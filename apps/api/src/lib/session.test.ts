@@ -5,6 +5,7 @@ import {
   readCombinedSession,
   sessionsFromToken,
   signCombinedSession,
+  withoutParticipant,
 } from "./session.js";
 
 describe("session cookie", () => {
@@ -31,6 +32,20 @@ describe("session cookie", () => {
       creator: { type: "creator", userId: "user-1" },
       participant: { type: "participant", participantId: "p-1", swapId: "swap-1" },
     });
+  });
+
+  it("drops the participant half and keeps the creator", async () => {
+    const creatorToken = await mergeSession(undefined, { type: "creator", userId: "user-1" });
+    const combined = await mergeSession(creatorToken, {
+      type: "participant",
+      participantId: "p-1",
+      swapId: "swap-1",
+    });
+    const creatorOnly = await withoutParticipant(combined);
+    await expect(sessionsFromToken(creatorOnly ?? undefined)).resolves.toEqual({
+      creator: { type: "creator", userId: "user-1" },
+    });
+    await expect(withoutParticipant(undefined)).resolves.toBeNull();
   });
 
   it("returns nothing for a missing or invalid cookie", async () => {

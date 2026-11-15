@@ -1,12 +1,21 @@
 import { z } from "zod";
 
+/** Empty number inputs arrive as "" or null. Treat those as "not set". */
+function emptyToUndefined(value: unknown) {
+  if (value === "" || value === null || value === undefined) return undefined;
+  if (typeof value === "number" && Number.isNaN(value)) return undefined;
+  return value;
+}
+
+const optionalPrice = z.preprocess(emptyToUndefined, z.number().int().min(0).optional());
+
 export const createSwapSchema = z.object({
   title: z.string().min(1).max(120),
   rulesText: z.string().max(2000).optional(),
   startDate: z.string().datetime({ offset: true }).or(z.string().regex(/^\d{4}-\d{2}-\d{2}/)),
   giftDeadline: z.string().datetime({ offset: true }).or(z.string().regex(/^\d{4}-\d{2}-\d{2}/)),
-  priceMin: z.number().int().min(0).optional(),
-  priceMax: z.number().int().min(0).optional(),
+  priceMin: optionalPrice,
+  priceMax: optionalPrice,
   autoMatch: z.boolean().default(true),
 });
 

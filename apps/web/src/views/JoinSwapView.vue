@@ -9,7 +9,7 @@ const router = useRouter();
 
 const code = ref(String(route.params.code ?? "").toUpperCase());
 const swapInfo = ref<{ title: string; canJoin: boolean } | null>(null);
-const config = ref<{ botInviteUrl: string } | null>(null);
+const config = ref<{ botInviteUrl: string; devTools?: boolean } | null>(null);
 
 const form = ref({
   firstName: "",
@@ -22,10 +22,11 @@ const error = ref("");
 const successUrl = ref("");
 
 const discordConnected = computed(() => !!form.value.discordUserId);
+const devTools = computed(() => !!config.value?.devTools);
 
 onMounted(async () => {
   const [cfg] = await Promise.all([
-    api.get<{ botInviteUrl: string }>("/api/auth/config").catch(() => null),
+    api.get<{ botInviteUrl: string; devTools?: boolean }>("/api/auth/config").catch(() => null),
     loadSwap(),
   ]);
   if (cfg) config.value = cfg;
@@ -57,7 +58,7 @@ async function loadSwap() {
 
 async function submit() {
   error.value = "";
-  if (!form.value.discordUserId) {
+  if (!form.value.discordUserId && !devTools.value) {
     error.value = "Connect Discord first";
     return;
   }
@@ -128,6 +129,9 @@ function goToMyPage() {
         >
           {{ discordConnected ? "Discord connected ✓" : "Connect Discord" }}
         </a>
+        <p v-if="devTools && !discordConnected" class="text-amber-200 text-xs">
+          Dev site: Discord is optional. You can join as a test participant.
+        </p>
       </section>
 
       <label class="block space-y-1">
@@ -148,7 +152,7 @@ function goToMyPage() {
       <button
         type="submit"
         class="w-full py-2.5 rounded-lg bg-steam text-slate-950 font-semibold disabled:opacity-50"
-        :disabled="!discordConnected"
+        :disabled="!discordConnected && !devTools"
       >
         Join swap
       </button>

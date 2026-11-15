@@ -14,7 +14,9 @@ import {
   updateSwap,
   getSwapFull,
   findParticipant,
+  findParticipantByDiscord,
   createParticipant,
+  DuplicateDiscordParticipantError,
   listParticipants,
   listWishlist,
   replaceWishlist,
@@ -24,7 +26,8 @@ import {
   upsertBlackout,
   deleteBlackout,
 } from "../db/swaps.js";
-import { config } from "../config.js";
+import { assertDevTools, config, devToolsEnabled } from "../config.js";
+import { findUserById } from "../db/users.js";
 import { generateSwapCode } from "../lib/codes.js";
 import { setSessionCookie } from "../lib/session.js";
 import { generateSecretToken, hashToken, verifyToken } from "../lib/tokens.js";
@@ -42,6 +45,16 @@ import type { SwapStatus } from "../db/types.js";
 function parseDate(input: string): Date {
   if (input.includes("T")) return new Date(input);
   return new Date(`${input}T12:00:00.000Z`);
+}
+
+function httpError(message: string, statusCode: number) {
+  const err = new Error(message);
+  (err as Error & { statusCode: number }).statusCode = statusCode;
+  return err;
+}
+
+function canAddParticipants(status: string) {
+  return status === "open" || status === "locked";
 }
 
 export async function swapRoutes(app: FastifyInstance) {
@@ -96,6 +109,103 @@ export async function swapRoutes(app: FastifyInstance) {
         manageUrl: `${config.webOrigin}/swap/${swap.code}/manage`,
       },
     };
+  });
+
+  app.post("/swaps/:code/dev/participants", async (request) => {
+    assertDevTools();
+    const { code } = request.params as { code: string };
+    const swap = await requireSwapCreator(request, code);
+    if (!canAddParticipants(swap.status)) {
+      throw httpError("This swap is no longer taking people", 400);
+    }
+
+    const body = request.body as { firstName?: string; steamUsername?: string };
+    const firstName = body.firstName?.trim() ?? "";
+    if (!firstName || firstName.length > 80) {
+      throw httpError("Name is required", 400);
+    }
+    const steamUsername = (body.steamUsername?.trim() || firstName).slice(0, 80);
+
+    const participant = await createParticipant(
+      swap.id,
+      {
+        firstName,
+        steamUsername,
+        steamId: null,
+        discordUserId: `dev:${crypto.randomUUID()}`,
+        discordTag: "Test participant",
+        secretTokenHash: await hashToken(generateSecretToken()),
+      },
+      [],
+    );
+
+    return {
+      participant: {
+        id: participant.id,
+        firstName: participant.firstName,
+        steamUsername: participant.steamUsername,
+      },
+    };
+  });
+
+  app.post("/swaps/:code/dev/join-as-me", async (request, reply) => {
+    assertDevTools();
+    const { code } = request.params as { code: string };
+    const swap = await requireSwapCreator(request, code);
+    const user = await findUserById(request.creatorSession!.userId);
+    if (!user) throw httpError("Unauthorized", 401);
+
+    const existing = await findParticipantByDiscord(swap.id, user.discordId);
+    const participant = existing ?? await (async () => {
+      if (!canAddParticipants(swap.status)) {
+        throw httpError("This swap is no longer taking people", 400);
+      }
+      try {
+        return await createParticipant(
+          swap.id,
+          {
+            firstName: (user.displayName || user.discordTag || "Me").slice(0, 80),
+            steamUsername: (user.discordTag || user.displayName || "me").slice(0, 80),
+            steamId: null,
+            discordUserId: user.discordId,
+            discordTag: user.discordTag,
+            secretTokenHash: await hashToken(generateSecretToken()),
+          },
+          [],
+        );
+      } catch (err) {
+        if (err instanceof DuplicateDiscordParticipantError) {
+          return findParticipantByDiscord(swap.id, user.discordId);
+        }
+        throw err;
+      }
+    })();
+
+    if (!participant) throw httpError("Could not join as yourself", 500);
+
+    await setSessionCookie(request, reply, {
+      type: "participant",
+      participantId: participant.id,
+      swapId: swap.id,
+    });
+
+    return { participantId: participant.id, code: swap.code };
+  });
+
+  app.post("/swaps/:code/dev/act-as/:participantId", async (request, reply) => {
+    assertDevTools();
+    const { code, participantId } = request.params as { code: string; participantId: string };
+    const swap = await requireSwapCreator(request, code);
+    const participant = await findParticipant(swap.id, participantId);
+    if (!participant) throw httpError("Participant not found", 404);
+
+    await setSessionCookie(request, reply, {
+      type: "participant",
+      participantId: participant.id,
+      swapId: swap.id,
+    });
+
+    return { ok: true, code: swap.code, firstName: participant.firstName };
   });
 
   app.get("/swaps/:code", async (request) => {
@@ -201,7 +311,17 @@ export async function swapRoutes(app: FastifyInstance) {
 
   app.post("/swaps/:code/join", async (request, reply) => {
     const { code } = request.params as { code: string };
-    const body = joinSwapSchema.parse(request.body);
+    let raw = request.body as Record<string, unknown> | null;
+    if (devToolsEnabled() && raw && typeof raw === "object" && !raw.discordUserId) {
+      raw = {
+        ...raw,
+        discordUserId: `dev:${crypto.randomUUID()}`,
+        discordTag: typeof raw.discordTag === "string" && raw.discordTag
+          ? raw.discordTag
+          : "Test participant",
+      };
+    }
+    const body = joinSwapSchema.parse(raw);
 
     const swap = await findSwapByCode(code);
     if (!swap) {
@@ -246,10 +366,12 @@ export async function swapRoutes(app: FastifyInstance) {
 
     const participantUrl = `${config.webOrigin}/s/${swap.code}/me/${secretToken}`;
 
-    await sendDirectMessage(
-      body.discordUserId,
-      buildSignupDm({ swapTitle: swap.title, code: swap.code }),
-    );
+    if (!body.discordUserId.startsWith("dev:")) {
+      await sendDirectMessage(
+        body.discordUserId,
+        buildSignupDm({ swapTitle: swap.title, code: swap.code }),
+      );
+    }
 
     return {
       participantId: participant.id,
