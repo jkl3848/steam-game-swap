@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { api } from "../api";
 import StatusBadge from "../components/StatusBadge.vue";
 
 const route = useRoute();
+const router = useRouter();
 const code = computed(() => String(route.params.code).toUpperCase());
 
 type Participant = {
@@ -27,8 +28,17 @@ const error = ref("");
 const blackoutA = ref("");
 const blackoutB = ref("");
 const matchError = ref("");
+const devTools = ref(false);
+const testName = ref("");
+const testSteam = ref("");
+const devError = ref("");
+const devBusy = ref(false);
 
-onMounted(load);
+onMounted(async () => {
+  const cfg = await api.get<{ devTools?: boolean }>("/api/auth/config").catch(() => null);
+  devTools.value = !!cfg?.devTools;
+  await load();
+});
 
 async function load() {
   try {
@@ -67,6 +77,51 @@ async function addBlackout() {
 async function removeBlackout(id: string) {
   await api.delete(`/api/swaps/${code.value}/blackouts/${id}`);
   await load();
+}
+
+async function addTestParticipant() {
+  devError.value = "";
+  const firstName = testName.value.trim();
+  if (!firstName) {
+    devError.value = "Add a name.";
+    return;
+  }
+  devBusy.value = true;
+  try {
+    await api.post(`/api/swaps/${code.value}/dev/participants`, {
+      firstName,
+      steamUsername: testSteam.value.trim() || undefined,
+    });
+    testName.value = "";
+    testSteam.value = "";
+    await load();
+  } catch (e) {
+    devError.value = e instanceof Error ? e.message : "Could not add that person";
+  } finally {
+    devBusy.value = false;
+  }
+}
+
+async function openAsMyself() {
+  devError.value = "";
+  devBusy.value = true;
+  try {
+    await api.post(`/api/swaps/${code.value}/dev/join-as-me`);
+    router.push(`/s/${code.value}/me`);
+  } catch (e) {
+    devError.value = e instanceof Error ? e.message : "Could not open your participant page";
+    devBusy.value = false;
+  }
+}
+
+async function openAs(participantId: string) {
+  devError.value = "";
+  try {
+    await api.post(`/api/swaps/${code.value}/dev/act-as/${participantId}`);
+    router.push(`/s/${code.value}/me`);
+  } catch (e) {
+    devError.value = e instanceof Error ? e.message : "Could not open that page";
+  }
 }
 
 function nameFor(id: string) {
@@ -113,6 +168,34 @@ const joinUrl = computed(() =>
 
     <p v-if="matchError" class="text-red-400 text-sm">{{ matchError }}</p>
 
+    <section v-if="devTools" class="p-4 rounded-xl border border-amber-500/30 bg-amber-500/5 space-y-3">
+      <h2 class="font-display text-lg font-semibold">Test with one account</h2>
+      <p class="text-slate-400 text-sm">
+        Join as yourself, or add extra people, then open the swap as that person.
+        Your creator login stays signed in. Matching still needs at least 3 people.
+      </p>
+      <button
+        type="button"
+        class="px-3 py-1.5 rounded bg-steam text-slate-950 text-sm font-semibold disabled:opacity-50"
+        :disabled="devBusy"
+        @click="openAsMyself"
+      >
+        Join as myself
+      </button>
+      <form class="flex flex-wrap gap-2" @submit.prevent="addTestParticipant">
+        <input v-model="testName" class="input-sm" placeholder="Test person name" />
+        <input v-model="testSteam" class="input-sm" placeholder="Steam name (optional)" />
+        <button
+          type="submit"
+          class="px-3 py-1 rounded border border-white/10 text-sm disabled:opacity-50"
+          :disabled="devBusy"
+        >
+          Add test person
+        </button>
+      </form>
+      <p v-if="devError" class="text-red-400 text-sm">{{ devError }}</p>
+    </section>
+
     <section class="p-4 rounded-xl border border-white/10 bg-slate-900/50">
       <h2 class="font-display text-lg font-semibold mb-2">Share link</h2>
       <code class="text-steam break-all">{{ joinUrl }}</code>
@@ -130,6 +213,7 @@ const joinUrl = computed(() =>
             <th class="pb-2">Discord</th>
             <th class="pb-2">Wishlist</th>
             <th v-if="data.swap.status === 'matched'" class="pb-2">Sent</th>
+            <th v-if="devTools" class="pb-2"></th>
           </tr>
         </thead>
         <tbody>
@@ -147,6 +231,11 @@ const joinUrl = computed(() =>
             <td class="py-2">{{ p.wishlistCount }}</td>
             <td v-if="data.swap.status === 'matched'" class="py-2">
               {{ p.giftSent ? "✓" : "—" }}
+            </td>
+            <td v-if="devTools" class="py-2 text-right">
+              <button type="button" class="text-steam hover:underline" @click="openAs(p.id)">
+                Open as them
+              </button>
             </td>
           </tr>
         </tbody>

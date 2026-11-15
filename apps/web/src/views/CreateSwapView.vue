@@ -5,23 +5,53 @@ import { api } from "../api";
 
 const router = useRouter();
 const error = ref("");
+const submitting = ref(false);
 const form = ref({
   title: "",
   rulesText: "",
   startDate: "",
   giftDeadline: "",
-  priceMin: undefined as number | undefined,
-  priceMax: undefined as number | undefined,
+  priceMin: "",
+  priceMax: "",
   autoMatch: true,
 });
 
+function priceOrUndefined(value: string): number | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const n = Number(trimmed);
+  if (!Number.isFinite(n)) return undefined;
+  return Math.trunc(n);
+}
+
 async function submit() {
   error.value = "";
+  const title = form.value.title.trim();
+  if (!title) {
+    error.value = "Add a title.";
+    return;
+  }
+  if (!form.value.startDate || !form.value.giftDeadline) {
+    error.value = "Set a match date and a gift deadline.";
+    return;
+  }
+
+  submitting.value = true;
   try {
-    const res = await api.post<{ swap: { code: string } }>("/api/swaps", form.value);
+    const res = await api.post<{ swap: { code: string } }>("/api/swaps", {
+      title,
+      rulesText: form.value.rulesText.trim() || undefined,
+      startDate: form.value.startDate,
+      giftDeadline: form.value.giftDeadline,
+      priceMin: priceOrUndefined(form.value.priceMin),
+      priceMax: priceOrUndefined(form.value.priceMax),
+      autoMatch: form.value.autoMatch,
+    });
     router.push(`/swap/${res.swap.code}/manage`);
   } catch (e) {
     error.value = e instanceof Error ? e.message : "Failed to create swap";
+  } finally {
+    submitting.value = false;
   }
 }
 </script>
@@ -30,10 +60,10 @@ async function submit() {
   <div class="max-w-lg mx-auto space-y-6">
     <h1 class="font-display text-3xl font-bold">Create swap</h1>
 
-    <form class="space-y-4" @submit.prevent="submit">
+    <form class="space-y-4" novalidate @submit.prevent="submit">
       <label class="block space-y-1">
         <span class="text-sm text-slate-400">Title</span>
-        <input v-model="form.title" required class="input" />
+        <input v-model="form.title" class="input" />
       </label>
       <label class="block space-y-1">
         <span class="text-sm text-slate-400">Rules (optional)</span>
@@ -42,21 +72,21 @@ async function submit() {
       <div class="grid grid-cols-2 gap-4">
         <label class="block space-y-1">
           <span class="text-sm text-slate-400">Match date</span>
-          <input v-model="form.startDate" type="date" required class="input" />
+          <input v-model="form.startDate" type="date" class="input" />
         </label>
         <label class="block space-y-1">
           <span class="text-sm text-slate-400">Gift deadline</span>
-          <input v-model="form.giftDeadline" type="date" required class="input" />
+          <input v-model="form.giftDeadline" type="date" class="input" />
         </label>
       </div>
       <div class="grid grid-cols-2 gap-4">
         <label class="block space-y-1">
           <span class="text-sm text-slate-400">Min price ($)</span>
-          <input v-model.number="form.priceMin" type="number" min="0" class="input" />
+          <input v-model="form.priceMin" type="number" min="0" class="input" />
         </label>
         <label class="block space-y-1">
           <span class="text-sm text-slate-400">Max price ($)</span>
-          <input v-model.number="form.priceMax" type="number" min="0" class="input" />
+          <input v-model="form.priceMax" type="number" min="0" class="input" />
         </label>
       </div>
       <label class="flex items-center gap-2 text-sm">
@@ -64,8 +94,12 @@ async function submit() {
         Auto-match on start date
       </label>
       <p v-if="error" class="text-red-400 text-sm">{{ error }}</p>
-      <button type="submit" class="w-full py-2.5 rounded-lg bg-steam text-slate-950 font-semibold">
-        Create swap
+      <button
+        type="submit"
+        class="w-full py-2.5 rounded-lg bg-steam text-slate-950 font-semibold disabled:opacity-50"
+        :disabled="submitting"
+      >
+        {{ submitting ? "Creating…" : "Create swap" }}
       </button>
     </form>
   </div>

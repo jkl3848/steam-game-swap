@@ -47,3 +47,28 @@ export function assertDiscordOAuth() {
     throw new Error("Discord OAuth not configured");
   }
 }
+
+/**
+ * Extra test actions (add people, open the swap as them) for local dev and
+ * the *-dev Firebase project. Set DEV_TOOLS=false to turn them off.
+ */
+export function devToolsEnabled(): boolean {
+  const flag = optional("DEV_TOOLS").trim().toLowerCase();
+  if (flag === "false" || flag === "0") return false;
+  if (flag === "true" || flag === "1") return true;
+  if (!config.isProd) return true;
+  const project =
+    process.env.GCLOUD_PROJECT ||
+    process.env.GOOGLE_CLOUD_PROJECT ||
+    process.env.FIREBASE_PROJECT_ID ||
+    "";
+  return project.endsWith("-dev");
+}
+
+export function assertDevTools() {
+  if (!devToolsEnabled()) {
+    const err = new Error("Not found");
+    (err as Error & { statusCode: number }).statusCode = 404;
+    throw err;
+  }
+}

@@ -49,7 +49,9 @@ export const api = onRequest(
         resolve();
       };
       res.on("finish", done);
-      res.on("close", done);
+      res.on("close", () => {
+        if (res.writableEnded) done();
+      });
       res.on("error", (err) => {
         if (settled) return;
         settled = true;

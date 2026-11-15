@@ -1,6 +1,6 @@
 # Steam Game Swap
 
-Secret Santa–style game swaps for Steam. Create a swap, share a code, collect wishlists, set blackouts, and run matches. Each gifter learns who they're buying for — not who got them.
+Anonymous gift swaps for Steam. Create a swap, share a code, collect wishlists, set blackouts, and run matches. Each gifter learns who they're buying for — not who got them.
 
 ## Features
 
@@ -65,6 +65,7 @@ Edit `.env` with your values. **Never commit `.env`** or service account JSON �
 | `DISCORD_BOT_INVITE_URL` | Later | Permanent invite to your hub server |
 | `STEAM_WEB_API_KEY` | No | Steam Web API key (profile resolve + wishlist import). Store search works without it. |
 | `GIFT_REMINDER_DAYS_BEFORE` | No | Days before deadline to send reminders (default: 3) |
+| `DEV_TOOLS` | No | `true` / `false`. When omitted, test-participant tools are on locally and on Firebase projects whose id ends in `-dev` |
 
 ### 3. Firebase project
 
@@ -107,6 +108,8 @@ pnpm dev:api
 ```
 
 Set `VITE_API_PROXY=http://localhost:3000` when running the web app against the standalone API.
+
+On a dev project (or locally), the swap manage page can add test people and open the swap as any of them, including yourself, without extra Discord accounts. Your creator login stays in the same browser. Set `DEV_TOOLS=false` to hide those controls.
 
 ### 6. Deploy
 

@@ -2,7 +2,9 @@ import Fastify from "fastify";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
+import { ZodError } from "zod";
 import { config } from "./config.js";
+import { parseIncomingJson } from "./lib/json-body.js";
 import { authPlugin } from "./plugins/auth.js";
 import { authApiRoutes, oauthRoutes } from "./routes/auth.js";
 import { steamRoutes } from "./routes/steam.js";
@@ -12,6 +14,12 @@ export async function buildApp() {
   const app = Fastify({
     logger: config.nodeEnv !== "test",
     trustProxy: true,
+  });
+
+  // Firebase has already consumed the body. Reading it again hangs the function.
+  app.removeContentTypeParser("application/json");
+  app.addContentTypeParser("application/json", { bodyLimit: 1_048_576 }, (req, payload, done) => {
+    parseIncomingJson(payload, done);
   });
 
   await app.register(cors, {
@@ -30,7 +38,17 @@ export async function buildApp() {
   // `app.register(authPlugin)` would encapsulate the hooks and silently skip them.
   await authPlugin(app);
 
-  app.setErrorHandler((error: Error & { statusCode?: number; code?: string }, _request, reply) => {
+  app.setErrorHandler((error: Error & { statusCode?: number; code?: string; cause?: unknown }, _request, reply) => {
+    const zod = error instanceof ZodError
+      ? error
+      : error.cause instanceof ZodError
+        ? error.cause
+        : null;
+    if (zod) {
+      const message = zod.issues.map((issue) => issue.message).filter(Boolean).join(". ");
+      reply.status(400).send({ error: message || "Invalid request", code: "VALIDATION" });
+      return;
+    }
     const statusCode = error.statusCode ?? 500;
     reply.status(statusCode).send({
       error: error.message,

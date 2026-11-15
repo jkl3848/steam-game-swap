@@ -6,6 +6,7 @@ export async function sendDirectMessage(
   discordUserId: string,
   content: string,
 ): Promise<boolean> {
+  if (discordUserId.startsWith("dev:")) return false;
   if (!config.discord.botToken) {
     console.warn("Discord bot not configured; skipping DM");
     return false;
