@@ -21,13 +21,22 @@ const router = createRouter({
 });
 
 router.beforeEach(async (to) => {
-  if (!to.meta.auth) return true;
+  let user: unknown = null;
   try {
-    const { user } = await api.get<{ user: unknown }>("/api/auth/me");
-    if (!user) return { name: "home", query: { login: "1" } };
+    const res = await api.get<{ user: unknown }>("/api/auth/me");
+    user = res.user;
   } catch {
+    user = null;
+  }
+
+  if (to.name === "home" && user && to.query.login !== "1" && !to.query.error) {
+    return { name: "dashboard" };
+  }
+
+  if (to.meta.auth && !user) {
     return { name: "home", query: { login: "1" } };
   }
+
   return true;
 });
 

@@ -51,7 +51,10 @@ async function leaveSwap() {
   <div class="min-h-screen flex flex-col">
     <header class="border-b border-white/10 bg-slate-950/80 backdrop-blur sticky top-0 z-50">
       <div class="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
-        <RouterLink to="/" class="font-display text-xl font-bold tracking-wide text-steam">
+        <RouterLink
+          :to="user ? '/dashboard' : '/'"
+          class="font-display text-xl font-bold tracking-wide text-steam"
+        >
           Steam Game Swap
         </RouterLink>
         <nav class="flex items-center gap-3 text-sm">
@@ -98,7 +101,7 @@ async function leaveSwap() {
       <slot />
     </main>
     <footer class="border-t border-white/10 py-6 text-center text-slate-500 text-sm">
-      Gift swaps for Steam games · Your data stays scoped to each swap
+      Gift swaps for Steam games
     </footer>
   </div>
 </template>

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
-import { discordLoginUrl } from "../api";
+import { api, discordLoginUrl } from "../api";
 
 const route = useRoute();
+const signedIn = ref(false);
 
 const oauthErrors: Record<string, string> = {
   oauth: "Discord did not finish authorizing. Please try signing in again.",
@@ -17,6 +18,15 @@ const notice = computed(() => {
   if (error) return oauthErrors[error] ?? "Sign-in failed. Please try again.";
   if (route.query.login === "1") return "Sign in with Discord to create a swap.";
   return null;
+});
+
+onMounted(async () => {
+  try {
+    const res = await api.get<{ user: unknown }>("/api/auth/me");
+    signedIn.value = !!res.user;
+  } catch {
+    signedIn.value = false;
+  }
 });
 </script>
 
@@ -53,8 +63,11 @@ const notice = computed(() => {
     </RouterLink>
   </div>
 
-  <p class="text-center mt-10">
+  <p v-if="!signedIn" class="text-center mt-10">
     <a :href="discordLoginUrl()" class="text-steam hover:underline">Sign in with Discord</a>
     to manage your swaps
+  </p>
+  <p v-else class="text-center mt-10">
+    <RouterLink to="/dashboard" class="text-steam hover:underline">Go to your dashboard</RouterLink>
   </p>
 </template>

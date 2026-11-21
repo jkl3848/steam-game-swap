@@ -105,6 +105,34 @@ export async function findSwapsByCreator(creatorUserId: string): Promise<Array<S
   return results;
 }
 
+/** Swaps where this Discord user is a participant (collection-group query). */
+export async function findSwapsByDiscordParticipant(
+  discordUserId: string,
+): Promise<Array<Swap & { participantId: string; participantCount: number }>> {
+  const q = await getDb()
+    .collectionGroup("participants")
+    .where("discordUserId", "==", discordUserId)
+    .get();
+
+  const results: Array<Swap & { participantId: string; participantCount: number }> = [];
+  for (const doc of q.docs) {
+    const swapId =
+      (doc.data().swapId as string | undefined) ?? doc.ref.parent.parent?.id;
+    if (!swapId) continue;
+    const swap = await findSwapById(swapId);
+    if (!swap) continue;
+    const participants = await listParticipants(swap.id);
+    results.push({
+      ...swap,
+      participantId: doc.id,
+      participantCount: participants.length,
+    });
+  }
+
+  results.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  return results;
+}
+
 export async function createSwap(data: Omit<Swap, "id" | "createdAt" | "updatedAt">): Promise<Swap> {
   const id = newId();
   const now = new Date();
