@@ -34,7 +34,13 @@ async function logout() {
   router.push("/");
 }
 
-async function stopActing() {
+async function leaveSwap() {
+  if (user.value) {
+    const ok = window.confirm(
+      "Leave this swap view? Your Discord login stays signed in.",
+    );
+    if (!ok) return;
+  }
   await api.post("/api/auth/dev/stop-acting");
   actingAs.value = null;
   router.push(user.value ? "/dashboard" : "/");
@@ -82,7 +88,9 @@ async function stopActing() {
         <span class="flex items-center gap-3">
           <RouterLink :to="`/s/${actingAs.code}/me`" class="underline">Their page</RouterLink>
           <RouterLink :to="`/swap/${actingAs.code}/manage`" class="underline">Manage</RouterLink>
-          <button type="button" class="underline" @click="stopActing">Stop</button>
+          <button type="button" class="underline" @click="leaveSwap">
+            {{ user ? "Leave swap" : "Stop" }}
+          </button>
         </span>
       </div>
     </div>

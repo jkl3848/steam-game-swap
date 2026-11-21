@@ -187,7 +187,7 @@ export async function createParticipant(
   const db = getDb();
   const participantsCol = db.collection("swaps").doc(swapId).collection("participants");
 
-  return db.runTransaction(async (tx) => {
+  const participant = await db.runTransaction(async (tx) => {
     if (data.discordUserId) {
       const dupQuery = participantsCol
         .where("discordUserId", "==", data.discordUserId)
@@ -214,24 +214,18 @@ export async function createParticipant(
       updatedAt: toTimestamp(now),
     });
 
-    wishlist.forEach((item, i) => {
-      const wId = newId();
-      tx.set(pRef.collection("wishlist").doc(wId), {
-        steamAppId: item.steamAppId,
-        name: item.name,
-        storeUrl: item.storeUrl,
-        priceHint: item.priceHint,
-        sortOrder: i,
-        createdAt: toTimestamp(now),
-      });
-    });
-
     return docToParticipant(id, swapId, {
       ...data,
       joinedAt: now,
       updatedAt: now,
     });
   });
+
+  if (wishlist.length > 0) {
+    await replaceWishlist(swapId, participant.id, wishlist);
+  }
+
+  return participant;
 }
 
 export async function updateParticipant(
@@ -270,20 +264,34 @@ export async function replaceWishlist(
 ): Promise<WishlistItem[]> {
   const pRef = getDb().collection("swaps").doc(swapId).collection("participants").doc(participantId);
   const existing = await pRef.collection("wishlist").get();
-  const batch = getDb().batch();
-  existing.docs.forEach((d) => batch.delete(d.ref));
+  // Firestore allows 500 writes per batch — leave headroom.
+  const BATCH_LIMIT = 450;
+
+  for (let i = 0; i < existing.docs.length; i += BATCH_LIMIT) {
+    const batch = getDb().batch();
+    for (const d of existing.docs.slice(i, i + BATCH_LIMIT)) {
+      batch.delete(d.ref);
+    }
+    await batch.commit();
+  }
+
   const now = new Date();
-  items.forEach((item, i) => {
-    batch.set(pRef.collection("wishlist").doc(newId()), {
-      steamAppId: item.steamAppId,
-      name: item.name,
-      storeUrl: item.storeUrl,
-      priceHint: item.priceHint,
-      sortOrder: i,
-      createdAt: toTimestamp(now),
+  for (let i = 0; i < items.length; i += BATCH_LIMIT) {
+    const batch = getDb().batch();
+    const chunk = items.slice(i, i + BATCH_LIMIT);
+    chunk.forEach((item, j) => {
+      batch.set(pRef.collection("wishlist").doc(newId()), {
+        steamAppId: item.steamAppId,
+        name: item.name,
+        storeUrl: item.storeUrl,
+        priceHint: item.priceHint,
+        sortOrder: i + j,
+        createdAt: toTimestamp(now),
+      });
     });
-  });
-  await batch.commit();
+    await batch.commit();
+  }
+
   return listWishlist(swapId, participantId);
 }
 

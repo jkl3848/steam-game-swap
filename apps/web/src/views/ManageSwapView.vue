@@ -18,11 +18,18 @@ type Participant = {
   giftSent: string | null;
 };
 
+type Assignment = {
+  giverId: string;
+  receiverId: string;
+  sentAt: string | null;
+};
+
 const data = ref<{
   swap: Record<string, unknown>;
   participants: Participant[];
   blackouts: Array<{ id: string; participantAId: string; participantBId: string }>;
   matchingPossible: boolean;
+  assignments: Assignment[] | null;
 } | null>(null);
 const error = ref("");
 const blackoutA = ref("");
@@ -128,6 +135,28 @@ function nameFor(id: string) {
   return data.value?.participants.find((p) => p.id === id)?.firstName ?? id;
 }
 
+function participantFor(id: string) {
+  return data.value?.participants.find((p) => p.id === id) ?? null;
+}
+
+const matchRows = computed(() => {
+  const assignments = data.value?.assignments;
+  if (!assignments?.length) return [];
+  return assignments.map((a) => {
+    const giver = participantFor(a.giverId);
+    const receiver = participantFor(a.receiverId);
+    return {
+      giverId: a.giverId,
+      receiverId: a.receiverId,
+      giverName: giver?.firstName ?? a.giverId,
+      receiverName: receiver?.firstName ?? a.receiverId,
+      receiverSteam: receiver?.steamUsername ?? "—",
+      receiverDiscord: receiver?.discordTag ?? null,
+      sentAt: a.sentAt ?? giver?.giftSent ?? null,
+    };
+  });
+});
+
 const joinUrl = computed(() =>
   data.value ? `${window.location.origin}/join/${code.value}` : "",
 );
@@ -199,6 +228,40 @@ const joinUrl = computed(() =>
     <section class="p-4 rounded-xl border border-white/10 bg-slate-900/50">
       <h2 class="font-display text-lg font-semibold mb-2">Share link</h2>
       <code class="text-steam break-all">{{ joinUrl }}</code>
+    </section>
+
+    <section
+      v-if="data.swap.status === 'matched' && matchRows.length"
+      class="p-4 rounded-xl border border-steam/30 bg-steam/5 space-y-3"
+    >
+      <h2 class="font-display text-lg font-semibold">Matches</h2>
+      <p class="text-slate-400 text-sm">Who is gifting whom after matching.</p>
+      <table class="w-full text-sm">
+        <thead class="text-slate-500 text-left">
+          <tr>
+            <th class="pb-2">Giver</th>
+            <th class="pb-2"></th>
+            <th class="pb-2">Receiver</th>
+            <th class="pb-2">Steam</th>
+            <th class="pb-2">Discord</th>
+            <th class="pb-2">Sent</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            v-for="row in matchRows"
+            :key="`${row.giverId}-${row.receiverId}`"
+            class="border-t border-white/5"
+          >
+            <td class="py-2 font-medium">{{ row.giverName }}</td>
+            <td class="py-2 text-steam">→</td>
+            <td class="py-2 font-medium">{{ row.receiverName }}</td>
+            <td class="py-2 text-slate-400">{{ row.receiverSteam }}</td>
+            <td class="py-2 text-slate-400">{{ row.receiverDiscord || "—" }}</td>
+            <td class="py-2">{{ row.sentAt ? "✓" : "—" }}</td>
+          </tr>
+        </tbody>
+      </table>
     </section>
 
     <section>

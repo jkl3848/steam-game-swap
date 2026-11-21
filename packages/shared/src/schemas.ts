@@ -33,7 +33,7 @@ export const joinSwapSchema = z.object({
         priceHint: z.string().optional(),
       }),
     )
-    .max(30)
+    .max(500)
     .default([]),
 });
 
@@ -52,7 +52,7 @@ export const wishlistItemSchema = z.object({
 });
 
 export const wishlistUpdateSchema = z.object({
-  items: z.array(wishlistItemSchema).max(30),
+  items: z.array(wishlistItemSchema).max(500),
 });
 
 export const blackoutSchema = z.object({

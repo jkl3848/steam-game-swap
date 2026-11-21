@@ -157,12 +157,6 @@ export async function handleDiscordCallback(request: FastifyRequest, reply: Fast
     ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png`
     : null;
 
-  if (stored.type === "participant_link" && stored.swapCode) {
-    return reply.redirect(
-      `${config.webOrigin}/join/${stored.swapCode}?discordId=${discordUser.id}&discordTag=${encodeURIComponent(tag)}`,
-    );
-  }
-
   const user = await upsertUser({
     discordId: discordUser.id,
     discordTag: tag,
@@ -174,6 +168,10 @@ export async function handleDiscordCallback(request: FastifyRequest, reply: Fast
 
   // 200 HTML (not 302) so Firebase Hosting / the browser keep Set-Cookie
   // on the Discord OAuth return trip.
+  if (stored.type === "participant_link" && stored.swapCode) {
+    return sendClientRedirect(reply, `${config.webOrigin}/join/${stored.swapCode}`);
+  }
+
   return sendClientRedirect(reply, `${config.webOrigin}/dashboard`);
 }
 

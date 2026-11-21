@@ -71,8 +71,14 @@ export function buildMatchDm(params: {
   if (params.wishlist.length === 0) {
     lines.push(`_(No games on wishlist yet)_`);
   } else {
-    for (const item of params.wishlist) {
+    const previewLimit = 12;
+    const preview = params.wishlist.slice(0, previewLimit);
+    for (const item of preview) {
       lines.push(`• [${item.name}](${item.storeUrl})`);
+    }
+    const remaining = params.wishlist.length - preview.length;
+    if (remaining > 0) {
+      lines.push(`_…and ${remaining} more on the web page_`);
     }
   }
 
@@ -85,7 +91,20 @@ export function buildMatchDm(params: {
   lines.push(``, `View on web: ${params.myPageUrl}`);
   lines.push(`Mark your gift as sent when done!`);
 
-  return lines.join("\n");
+  const message = lines.join("\n");
+  // Discord hard limit is 2000 characters.
+  if (message.length <= 1900) return message;
+  return [
+    `🎮 **${params.swapTitle}** — your match is ready!`,
+    ``,
+    `You're gifting for **${params.gifteeFirstName}**`,
+    `Steam: \`${params.steamUsername}\`${params.discordTag ? ` · Discord: ${params.discordTag}` : ""}`,
+    ``,
+    `Their wishlist is long — open the web page for the full list:`,
+    params.myPageUrl,
+    ``,
+    `Mark your gift as sent when done!`,
+  ].join("\n");
 }
 
 export function buildReminderDm(params: {

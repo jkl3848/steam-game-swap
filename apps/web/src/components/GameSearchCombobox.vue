@@ -68,7 +68,7 @@ async function importWishlist() {
         merged.push(item);
       }
     }
-    emit("update:modelValue", merged.slice(0, 30));
+    emit("update:modelValue", merged.slice(0, 500));
   } catch (e) {
     importError.value =
       e instanceof Error ? e.message : "Could not import wishlist. Search for games instead.";
@@ -112,7 +112,10 @@ async function importWishlist() {
         <span v-if="game.priceHint" class="text-steam text-sm">{{ game.priceHint }}</span>
       </li>
     </ul>
-    <ul v-if="modelValue.length" class="space-y-2">
+    <ul
+      v-if="modelValue.length"
+      class="space-y-2 max-h-80 overflow-auto pr-1"
+    >
       <li
         v-for="game in modelValue"
         :key="game.steamAppId"
@@ -130,6 +133,9 @@ async function importWishlist() {
         </button>
       </li>
     </ul>
-    <p v-else class="text-slate-500 text-sm">Add games to your wishlist (up to 30)</p>
+    <p v-else class="text-slate-500 text-sm">Add games to your wishlist (up to 500)</p>
+    <p v-if="modelValue.length" class="text-slate-500 text-xs">
+      {{ modelValue.length }} / 500 games
+    </p>
   </div>
 </template>
