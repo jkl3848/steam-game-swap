@@ -19,7 +19,19 @@ export async function buildApp() {
   // Firebase has already consumed the body. Reading it again hangs the function.
   app.removeContentTypeParser("application/json");
   app.addContentTypeParser("application/json", { bodyLimit: 1_048_576 }, (req, payload, done) => {
-    parseIncomingJson(payload, done);
+    type BodyCarrier = {
+      body?: unknown;
+      rawBody?: Buffer | Uint8Array | string;
+      readableEnded?: boolean;
+      destroyed?: boolean;
+      on?: (...args: unknown[]) => unknown;
+    };
+    const stream = payload as BodyCarrier;
+    const raw = req.raw as BodyCarrier;
+    // functions-framework attaches body/rawBody on the IncomingMessage.
+    if (stream.body === undefined && raw?.body !== undefined) stream.body = raw.body;
+    if (stream.rawBody === undefined && raw?.rawBody !== undefined) stream.rawBody = raw.rawBody;
+    parseIncomingJson(stream as Parameters<typeof parseIncomingJson>[0], done);
   });
 
   await app.register(cors, {

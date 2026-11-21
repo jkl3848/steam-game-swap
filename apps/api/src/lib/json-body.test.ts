@@ -21,6 +21,40 @@ describe("parseIncomingJson", () => {
     expect(called).toBe(true);
   });
 
+  it("uses a parsed body even when rawBody is missing", () => {
+    const payload = new Readable({
+      read() {
+        /* never emits */
+      },
+    }) as Readable & { body?: unknown; rawBody?: Buffer };
+    payload.body = { title: "NoRaw" };
+
+    let called = false;
+    parseIncomingJson(payload, (err, body) => {
+      called = true;
+      expect(err).toBeNull();
+      expect(body).toEqual({ title: "NoRaw" });
+    });
+    expect(called).toBe(true);
+  });
+
+  it("does not hang when the stream already ended with no body", () => {
+    const payload = {
+      readableEnded: true,
+      on() {
+        throw new Error("should not subscribe to a drained stream");
+      },
+    } as unknown as Parameters<typeof parseIncomingJson>[0];
+
+    let called = false;
+    parseIncomingJson(payload, (err, body) => {
+      called = true;
+      expect(err).toBeNull();
+      expect(body).toBeUndefined();
+    });
+    expect(called).toBe(true);
+  });
+
   it("parses a normal request stream", () => {
     return new Promise<void>((resolve, reject) => {
       const payload = Readable.from([Buffer.from('{"title":"Local"}')]) as Readable & {

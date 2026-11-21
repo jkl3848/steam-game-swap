@@ -14,10 +14,16 @@
         ".git",
         "firebase-debug.log",
         "firebase-debug.*.log",
-        "src/**/*.test.ts"
+        "src/**/*.test.ts",
+        ".env",
+        ".env.*",
+        "package.json.firebase-backup"
       ],
       "predeploy": [
-        "pnpm --filter @steam-game-swap/api build"
+        "node scripts/stage-api-for-firebase.mjs"
+      ],
+      "postdeploy": [
+        "node scripts/unstage-api-for-firebase.mjs"
       ]
     }
   ],
