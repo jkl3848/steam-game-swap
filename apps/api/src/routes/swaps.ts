@@ -312,15 +312,36 @@ export async function swapRoutes(app: FastifyInstance) {
   app.post("/swaps/:code/join", async (request, reply) => {
     const { code } = request.params as { code: string };
     let raw = request.body as Record<string, unknown> | null;
-    if (devToolsEnabled() && raw && typeof raw === "object" && !raw.discordUserId) {
+    if (!raw || typeof raw !== "object") {
+      raw = {};
+    }
+
+    // Production: Discord identity comes from the signed-in session only.
+    // Dev tools: allow a body id (tests) or auto-inject a fake one.
+    const sessionUser = request.creatorSession
+      ? await findUserById(request.creatorSession.userId)
+      : null;
+
+    if (sessionUser) {
       raw = {
         ...raw,
-        discordUserId: `dev:${crypto.randomUUID()}`,
-        discordTag: typeof raw.discordTag === "string" && raw.discordTag
-          ? raw.discordTag
-          : "Test participant",
+        discordUserId: sessionUser.discordId,
+        discordTag: sessionUser.discordTag ?? sessionUser.displayName ?? undefined,
       };
+    } else if (devToolsEnabled()) {
+      if (!raw.discordUserId) {
+        raw = {
+          ...raw,
+          discordUserId: `dev:${crypto.randomUUID()}`,
+          discordTag: typeof raw.discordTag === "string" && raw.discordTag
+            ? raw.discordTag
+            : "Test participant",
+        };
+      }
+    } else {
+      throw httpError("Sign in with Discord to join this swap", 401);
     }
+
     const body = joinSwapSchema.parse(raw);
 
     const swap = await findSwapByCode(code);

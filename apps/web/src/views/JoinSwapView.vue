@@ -10,30 +10,34 @@ const router = useRouter();
 const code = ref(String(route.params.code ?? "").toUpperCase());
 const swapInfo = ref<{ title: string; canJoin: boolean } | null>(null);
 const config = ref<{ botInviteUrl: string; devTools?: boolean } | null>(null);
+const discordUser = ref<{
+  displayName?: string | null;
+  discordTag?: string | null;
+  discordId?: string;
+} | null>(null);
 
 const form = ref({
   firstName: "",
   steamUsername: "",
-  discordUserId: "",
-  discordTag: "",
 });
 const wishlist = ref<WishlistGame[]>([]);
 const error = ref("");
 const successUrl = ref("");
+const loadingMe = ref(true);
 
-const discordConnected = computed(() => !!form.value.discordUserId);
+const discordConnected = computed(() => !!discordUser.value);
 const devTools = computed(() => !!config.value?.devTools);
+const canShowJoinForm = computed(
+  () => discordConnected.value || (devTools.value && !loadingMe.value),
+);
 
 onMounted(async () => {
   const [cfg] = await Promise.all([
     api.get<{ botInviteUrl: string; devTools?: boolean }>("/api/auth/config").catch(() => null),
     loadSwap(),
+    loadMe(),
   ]);
   if (cfg) config.value = cfg;
-
-  const q = route.query;
-  if (q.discordId) form.value.discordUserId = String(q.discordId);
-  if (q.discordTag) form.value.discordTag = String(q.discordTag);
 });
 
 watch(
@@ -43,6 +47,30 @@ watch(
     loadSwap();
   },
 );
+
+async function loadMe() {
+  loadingMe.value = true;
+  try {
+    const res = await api.get<{
+      user: {
+        discordId: string;
+        discordTag?: string | null;
+        displayName?: string | null;
+      } | null;
+    }>("/api/auth/me");
+    discordUser.value = res.user
+      ? {
+          discordId: res.user.discordId,
+          discordTag: res.user.discordTag,
+          displayName: res.user.displayName,
+        }
+      : null;
+  } catch {
+    discordUser.value = null;
+  } finally {
+    loadingMe.value = false;
+  }
+}
 
 async function loadSwap() {
   if (!code.value) return;
@@ -58,8 +86,8 @@ async function loadSwap() {
 
 async function submit() {
   error.value = "";
-  if (!form.value.discordUserId && !devTools.value) {
-    error.value = "Connect Discord first";
+  if (!discordConnected.value && !devTools.value) {
+    error.value = "Sign in with Discord first";
     return;
   }
   try {
@@ -107,10 +135,11 @@ function goToMyPage() {
       </div>
     </template>
 
-    <form v-else-if="swapInfo?.canJoin" class="space-y-4" @submit.prevent="submit">
+    <template v-else-if="swapInfo?.canJoin">
       <section class="p-4 rounded-xl border border-[#5865F2]/30 bg-[#5865F2]/5 space-y-2">
         <h2 class="font-semibold text-sm">Discord required</h2>
         <p class="text-slate-400 text-xs">
+          Sign in with Discord to join. We'll remember you for 30 days in this browser.
           Join our server so the bot can DM you when matches are ready.
         </p>
         <a
@@ -122,41 +151,49 @@ function goToMyPage() {
         >
           Join Discord server →
         </a>
+        <template v-if="discordConnected">
+          <p class="text-emerald-300 text-sm">
+            Signed in as
+            <strong>{{ discordUser?.displayName || discordUser?.discordTag || "Discord user" }}</strong>
+          </p>
+        </template>
         <a
-          v-if="code"
+          v-else-if="code"
           :href="discordLinkUrl(code)"
           class="block w-full text-center py-2 rounded bg-[#5865F2] text-white font-medium"
         >
-          {{ discordConnected ? "Discord connected ✓" : "Connect Discord" }}
+          Sign in with Discord
         </a>
         <p v-if="devTools && !discordConnected" class="text-amber-200 text-xs">
           Dev site: Discord is optional. You can join as a test participant.
         </p>
       </section>
 
-      <label class="block space-y-1">
-        <span class="text-sm text-slate-400">First name</span>
-        <input v-model="form.firstName" required class="input" />
-      </label>
-      <label class="block space-y-1">
-        <span class="text-sm text-slate-400">Steam username</span>
-        <input v-model="form.steamUsername" required class="input" placeholder="your_steam_name" />
-      </label>
+      <form v-if="canShowJoinForm" class="space-y-4" @submit.prevent="submit">
+        <label class="block space-y-1">
+          <span class="text-sm text-slate-400">First name</span>
+          <input v-model="form.firstName" required class="input" />
+        </label>
+        <label class="block space-y-1">
+          <span class="text-sm text-slate-400">Steam username</span>
+          <input v-model="form.steamUsername" required class="input" placeholder="your_steam_name" />
+        </label>
 
-      <div>
-        <span class="text-sm text-slate-400 block mb-2">Wishlist</span>
-        <GameSearchCombobox v-model="wishlist" />
-      </div>
+        <div>
+          <span class="text-sm text-slate-400 block mb-2">Wishlist</span>
+          <GameSearchCombobox v-model="wishlist" />
+        </div>
 
-      <p v-if="error" class="text-red-400 text-sm">{{ error }}</p>
-      <button
-        type="submit"
-        class="w-full py-2.5 rounded-lg bg-steam text-slate-950 font-semibold disabled:opacity-50"
-        :disabled="!discordConnected && !devTools"
-      >
-        Join swap
-      </button>
-    </form>
+        <p v-if="error" class="text-red-400 text-sm">{{ error }}</p>
+        <button
+          type="submit"
+          class="w-full py-2.5 rounded-lg bg-steam text-slate-950 font-semibold disabled:opacity-50"
+          :disabled="!discordConnected && !devTools"
+        >
+          Join swap
+        </button>
+      </form>
+    </template>
 
     <p v-else-if="swapInfo && !swapInfo.canJoin" class="text-amber-400">
       This swap is not accepting new signups.

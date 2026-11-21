@@ -28,7 +28,7 @@ export async function steamRoutes(app: FastifyInstance) {
     }
 
     const participant = await requireParticipantForSwap(request, swap.id);
-    const steamId =
+    let steamId =
       participant.steamId ?? (await resolveSteamId(participant.steamUsername));
     if (!steamId) {
       const err = new Error(
@@ -39,8 +39,25 @@ export async function steamRoutes(app: FastifyInstance) {
     }
 
     try {
-      const items = await importWishlist(steamId);
-      return { items };
+      try {
+        const items = await importWishlist(steamId);
+        return { items };
+      } catch (e) {
+        // Cached steamId may be stale — re-resolve once on empty/private.
+        if (
+          e instanceof SteamWishlistError &&
+          e.code === "EMPTY_OR_PRIVATE" &&
+          participant.steamId
+        ) {
+          const resolved = await resolveSteamId(participant.steamUsername);
+          if (resolved && resolved !== steamId) {
+            steamId = resolved;
+            const items = await importWishlist(steamId);
+            return { items };
+          }
+        }
+        throw e;
+      }
     } catch (e) {
       if (e instanceof SteamWishlistError) {
         const err = new Error(e.message);
