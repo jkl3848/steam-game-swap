@@ -2,14 +2,12 @@ import { onRequest } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { defineSecret, defineString } from "firebase-functions/params";
 import type { FastifyInstance } from "fastify";
-import { buildApp } from "./app.js";
-import { runAutoMatch, runGiftReminders } from "./services/swap-match.js";
 
 /** Public (non-secret) config — values come from apps/api/.env.<project> at deploy time. */
 defineString("WEB_ORIGIN", { default: "https://steam-game-swap-dev.web.app" });
 defineString("API_PUBLIC_URL", { default: "https://steam-game-swap-dev.web.app" });
-defineString("DISCORD_CLIENT_ID");
-defineString("DISCORD_BOT_INVITE_URL");
+defineString("DISCORD_CLIENT_ID", { default: "" });
+defineString("DISCORD_BOT_INVITE_URL", { default: "https://discord.com/channels/@me" });
 
 const sessionSecret = defineSecret("SESSION_SECRET");
 const discordClientSecret = defineSecret("DISCORD_CLIENT_SECRET");
@@ -27,6 +25,8 @@ let cachedApp: FastifyInstance | undefined;
 
 async function getApp(): Promise<FastifyInstance> {
   if (!cachedApp) {
+    // Lazy-load so deploy discovery does not import Fastify/bcrypt/admin at module load.
+    const { buildApp } = await import("./app.js");
     cachedApp = await buildApp();
     await cachedApp.ready();
   }
@@ -69,6 +69,7 @@ export const scheduler = onSchedule(
     secrets,
   },
   async () => {
+    const { runAutoMatch, runGiftReminders } = await import("./services/swap-match.js");
     await runAutoMatch();
     await runGiftReminders();
   },

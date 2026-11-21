@@ -6,6 +6,8 @@ dist
 *-firebase-adminsdk-*.json
 service-account*.json
 .firebase/
+apps/api/vendor/
+apps/api/package.json.firebase-backup
 firebase-debug.log
 firebase-debug.*.log
 *.log

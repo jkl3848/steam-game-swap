@@ -156,6 +156,7 @@ firestore.indexes.json  Composite indexes for queries
 | `pnpm dev:emulators` | Firebase Emulator Suite |
 | `pnpm build` | Build all packages |
 | `pnpm deploy` | Deploy Hosting + Functions (Functions need Blaze) |
+| `pnpm deploy:functions` | Deploy Cloud Functions only (stages workspace deps for npm) |
 | `pnpm deploy:hosting` | Deploy Hosting only (used by GitHub Actions on `main`) |
 | `pnpm test` | Web unit tests + API tests (Firestore emulator) |
 | `pnpm test:web` | Vue / create-form unit tests |
