@@ -49,20 +49,16 @@ export function assertDiscordOAuth() {
 }
 
 /**
- * Extra test actions (add people, open the swap as them) for local dev and
- * the *-dev Firebase project. Set DEV_TOOLS=false to turn them off.
+ * Extra test actions (add fake participants, open the swap as them).
+ * On for local development only. The hosted site stays off, including the
+ * Firebase project whose id ends in `-dev`. Set DEV_TOOLS=true to force them on.
  */
 export function devToolsEnabled(): boolean {
   const flag = optional("DEV_TOOLS").trim().toLowerCase();
   if (flag === "false" || flag === "0") return false;
   if (flag === "true" || flag === "1") return true;
-  if (!config.isProd) return true;
-  const project =
-    process.env.GCLOUD_PROJECT ||
-    process.env.GOOGLE_CLOUD_PROJECT ||
-    process.env.FIREBASE_PROJECT_ID ||
-    "";
-  return project.endsWith("-dev");
+  if (process.env.K_SERVICE && process.env.FUNCTIONS_EMULATOR !== "true") return false;
+  return !config.isProd;
 }
 
 export function assertDevTools() {
