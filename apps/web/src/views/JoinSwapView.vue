@@ -164,9 +164,6 @@ function goToMyPage() {
         >
           Sign in with Discord
         </a>
-        <p v-if="devTools && !discordConnected" class="text-amber-200 text-xs">
-          Dev site: Discord is optional. You can join as a test participant.
-        </p>
       </section>
 
       <form v-if="canShowJoinForm" class="space-y-4" @submit.prevent="submit">

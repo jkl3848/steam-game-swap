@@ -129,7 +129,10 @@ async function markSent() {
       </button>
     </section>
 
-    <section v-else class="text-slate-500 text-sm">
+    <section
+      v-else-if="page.swap.status !== 'matched' && page.swap.status !== 'completed'"
+      class="text-slate-500 text-sm"
+    >
       <p>Hi {{ page.participant.firstName }} — signups are closed. Check back after matching!</p>
     </section>
   </div>

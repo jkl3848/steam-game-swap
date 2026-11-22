@@ -10,6 +10,7 @@ import {
 import {
   findSwapByCode,
   findSwapsByCreator,
+  findSwapsByDiscordParticipant,
   createSwap,
   updateSwap,
   getSwapFull,
@@ -60,9 +61,16 @@ function canAddParticipants(status: string) {
 export async function swapRoutes(app: FastifyInstance) {
   app.get("/swaps/mine", async (request) => {
     requireCreator(request);
-    const swaps = await findSwapsByCreator(request.creatorSession!.userId);
-    return {
-      swaps: swaps.map((s) => ({
+    const userId = request.creatorSession!.userId;
+    const user = await findUserById(userId);
+    const created = await findSwapsByCreator(userId);
+    const joined = user?.discordId
+      ? await findSwapsByDiscordParticipant(user.discordId)
+      : [];
+
+    const createdIds = new Set(created.map((s) => s.id));
+    const swaps = [
+      ...created.map((s) => ({
         id: s.id,
         code: s.code,
         title: s.title,
@@ -71,8 +79,27 @@ export async function swapRoutes(app: FastifyInstance) {
         giftDeadline: s.giftDeadline,
         participantCount: s.participantCount,
         autoMatch: s.autoMatch,
+        role: "creator" as const,
       })),
-    };
+      ...joined
+        .filter((s) => !createdIds.has(s.id))
+        .map((s) => ({
+          id: s.id,
+          code: s.code,
+          title: s.title,
+          status: s.status,
+          startDate: s.startDate,
+          giftDeadline: s.giftDeadline,
+          participantCount: s.participantCount,
+          autoMatch: s.autoMatch,
+          role: "participant" as const,
+        })),
+    ].sort(
+      (a, b) =>
+        new Date(b.startDate).getTime() - new Date(a.startDate).getTime(),
+    );
+
+    return { swaps };
   });
 
   app.post("/swaps", async (request) => {
