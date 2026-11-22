@@ -44,6 +44,7 @@ describe("create swap request", () => {
       priceMin: "",
       priceMax: null,
       autoMatch: true,
+      discordInviteUrl: "https://discord.gg/example",
     });
     expect(parsed.priceMin).toBeUndefined();
     expect(parsed.priceMax).toBeUndefined();
@@ -57,6 +58,7 @@ describe("create swap request", () => {
       priceMin: 15,
       priceMax: 40,
       autoMatch: true,
+      discordInviteUrl: "https://discord.gg/example",
     });
     expect(parsed.priceMin).toBe(15);
     expect(parsed.priceMax).toBe(40);
@@ -67,6 +69,7 @@ describe("create swap request", () => {
       title: "Friday swap",
       startDate: "2026-12-01",
       giftDeadline: "2026-12-20",
+      discordInviteUrl: "https://discord.gg/example",
     });
     expect(parsed.priceMin).toBeUndefined();
     expect(parsed.priceMax).toBeUndefined();

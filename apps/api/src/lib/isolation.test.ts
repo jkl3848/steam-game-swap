@@ -47,6 +47,7 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)("swap isolation", () => {
           title: "Swap A",
           startDate: "2026-12-01",
           giftDeadline: "2026-12-20",
+          discordInviteUrl: "https://discord.gg/example",
         },
       });
       const swapB = await app.inject({
@@ -57,6 +58,7 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)("swap isolation", () => {
           title: "Swap B",
           startDate: "2026-12-01",
           giftDeadline: "2026-12-20",
+          discordInviteUrl: "https://discord.gg/example",
         },
       });
       expect(swapA.statusCode).toBe(200);

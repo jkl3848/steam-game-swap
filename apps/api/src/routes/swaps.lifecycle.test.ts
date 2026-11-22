@@ -28,6 +28,7 @@ async function createOpenSwap(
       startDate: "2026-12-01",
       giftDeadline: "2026-12-20",
       autoMatch: true,
+      discordInviteUrl: "https://discord.gg/example",
       ...extra,
     },
   });
