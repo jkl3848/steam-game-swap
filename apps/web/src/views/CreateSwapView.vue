@@ -7,6 +7,7 @@ import { priceOrUndefined } from "../lib/price";
 const router = useRouter();
 const error = ref("");
 const submitting = ref(false);
+const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 const form = ref({
   title: "",
   rulesText: "",
@@ -15,7 +16,12 @@ const form = ref({
   priceMin: "" as string | number,
   priceMax: "" as string | number,
   autoMatch: true,
+  discordInviteUrl: "",
 });
+
+function toIsoLocal(datetimeLocal: string): string {
+  return new Date(datetimeLocal).toISOString();
+}
 
 async function submit() {
   error.value = "";
@@ -28,17 +34,23 @@ async function submit() {
     error.value = "Set a match date and a gift deadline.";
     return;
   }
+  if (!form.value.discordInviteUrl.trim()) {
+    error.value = "Add a Discord server invite link.";
+    return;
+  }
 
   submitting.value = true;
   try {
     const res = await api.post<{ swap: { code: string } }>("/api/swaps", {
       title,
       rulesText: form.value.rulesText.trim() || undefined,
-      startDate: form.value.startDate,
-      giftDeadline: form.value.giftDeadline,
+      startDate: toIsoLocal(form.value.startDate),
+      giftDeadline: toIsoLocal(form.value.giftDeadline),
       priceMin: priceOrUndefined(form.value.priceMin),
       priceMax: priceOrUndefined(form.value.priceMax),
       autoMatch: form.value.autoMatch,
+      discordInviteUrl: form.value.discordInviteUrl.trim(),
+      timeZone: localTz,
     });
     router.push(`/swap/${res.swap.code}/manage`);
   } catch (e) {
@@ -62,16 +74,27 @@ async function submit() {
         <span class="text-sm text-slate-400">Rules (optional)</span>
         <textarea v-model="form.rulesText" rows="3" class="input" />
       </label>
-      <div class="grid grid-cols-2 gap-4">
+      <label class="block space-y-1">
+        <span class="text-sm text-slate-400">Discord server invite link</span>
+        <input
+          v-model="form.discordInviteUrl"
+          type="url"
+          class="input"
+          placeholder="https://discord.gg/..."
+        />
+        <span class="text-xs text-slate-500">Participants will use this link to join your server for DMs.</span>
+      </label>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <label class="block space-y-1">
-          <span class="text-sm text-slate-400">Match date</span>
-          <input v-model="form.startDate" type="date" class="input" />
+          <span class="text-sm text-slate-400">Match date &amp; time</span>
+          <input v-model="form.startDate" type="datetime-local" class="input" />
         </label>
         <label class="block space-y-1">
           <span class="text-sm text-slate-400">Gift deadline</span>
-          <input v-model="form.giftDeadline" type="date" class="input" />
+          <input v-model="form.giftDeadline" type="datetime-local" class="input" />
         </label>
       </div>
+      <p class="text-xs text-slate-500">Times are in your local timezone ({{ localTz }}).</p>
       <div class="grid grid-cols-2 gap-4">
         <label class="block space-y-1">
           <span class="text-sm text-slate-400">Min price ($)</span>

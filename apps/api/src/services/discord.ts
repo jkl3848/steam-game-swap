@@ -62,12 +62,19 @@ export async function sendDirectMessage(
   }
 }
 
+export function steamProfileUrl(steamId: string | null | undefined, steamUsername: string): string {
+  if (steamId && /^\d{17}$/.test(steamId)) {
+    return `https://steamcommunity.com/profiles/${steamId}`;
+  }
+  return `https://steamcommunity.com/id/${encodeURIComponent(steamUsername)}`;
+}
+
 export function buildMatchDm(params: {
   swapTitle: string;
   gifteeFirstName: string;
   steamUsername: string;
+  steamProfileUrl: string;
   discordTag?: string | null;
-  wishlist: Array<{ name: string; storeUrl: string }>;
   priceMin?: number | null;
   priceMax?: number | null;
   myPageUrl: string;
@@ -76,23 +83,11 @@ export function buildMatchDm(params: {
     `🎮 **${params.swapTitle}** — your match is ready!`,
     ``,
     `You're gifting for **${params.gifteeFirstName}**`,
-    `Steam: \`${params.steamUsername}\`${params.discordTag ? ` · Discord: ${params.discordTag}` : ""}`,
-    ``,
-    `**Wishlist:**`,
+    `Steam: **${params.steamUsername}** — [Steam profile](${params.steamProfileUrl})`,
   ];
 
-  if (params.wishlist.length === 0) {
-    lines.push(`_(No games on wishlist yet)_`);
-  } else {
-    const previewLimit = 12;
-    const preview = params.wishlist.slice(0, previewLimit);
-    for (const item of preview) {
-      lines.push(`• [${item.name}](${item.storeUrl})`);
-    }
-    const remaining = params.wishlist.length - preview.length;
-    if (remaining > 0) {
-      lines.push(`_…and ${remaining} more on the web page_`);
-    }
+  if (params.discordTag) {
+    lines.push(`Discord: ${params.discordTag}`);
   }
 
   if (params.priceMin != null || params.priceMax != null) {
@@ -101,23 +96,18 @@ export function buildMatchDm(params: {
     lines.push(``, `**Price range:** ${min} – ${max}`);
   }
 
-  lines.push(``, `View on web: ${params.myPageUrl}`);
-  lines.push(`Mark your gift as sent when done!`);
-
-  const message = lines.join("\n");
-  // Discord hard limit is 2000 characters.
-  if (message.length <= 1900) return message;
-  return [
-    `🎮 **${params.swapTitle}** — your match is ready!`,
+  lines.push(
     ``,
-    `You're gifting for **${params.gifteeFirstName}**`,
-    `Steam: \`${params.steamUsername}\`${params.discordTag ? ` · Discord: ${params.discordTag}` : ""}`,
-    ``,
-    `Their wishlist is long — open the web page for the full list:`,
+    `**Next steps:**`,
+    `1. Friend them on Steam using their profile link above`,
+    `2. Once they accept, send their gift through Steam`,
+    `3. Open your swap dashboard to view their wishlist:`,
     params.myPageUrl,
     ``,
     `Mark your gift as sent when done!`,
-  ].join("\n");
+  );
+
+  return lines.join("\n");
 }
 
 export function buildReminderDm(params: {
@@ -134,9 +124,24 @@ export function buildReminderDm(params: {
   ].join("\n");
 }
 
-export function buildSignupDm(params: { swapTitle: string; code: string }): string {
-  return [
+export function buildSignupDm(params: {
+  swapTitle: string;
+  code: string;
+  discordInviteUrl?: string | null;
+}): string {
+  const lines = [
     `✅ You're signed up for **${params.swapTitle}** (\`${params.code}\`).`,
     `We'll DM you again when matches are made!`,
+  ];
+  if (params.discordInviteUrl) {
+    lines.push(``, `Stay in the swap Discord: ${params.discordInviteUrl}`);
+  }
+  return lines.join("\n");
+}
+
+export function buildCancelDm(params: { swapTitle: string; code: string }): string {
+  return [
+    `❌ **${params.swapTitle}** (\`${params.code}\`) has been cancelled by the organizer.`,
+    `You no longer need to send a gift for this swap.`,
   ].join("\n");
 }

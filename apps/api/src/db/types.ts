@@ -27,6 +27,8 @@ export type Swap = {
   priceMax: number | null;
   status: SwapStatus;
   autoMatch: boolean;
+  discordInviteUrl: string | null;
+  timeZone: string | null;
   creatorUserId: string;
   createdAt: Date;
   updatedAt: Date;

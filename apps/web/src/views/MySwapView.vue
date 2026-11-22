@@ -16,7 +16,13 @@ const page = ref<{
 } | null>(null);
 
 const assignment = ref<{
-  receiver: { firstName: string; steamUsername: string; discordTag: string | null };
+  receiver: {
+    firstName: string;
+    steamUsername: string;
+    steamId: string | null;
+    steamProfileUrl: string;
+    discordTag: string | null;
+  };
   wishlist: WishlistGame[];
   sentAt: string | null;
   priceMin: number | null;
@@ -83,9 +89,21 @@ async function markSent() {
       <h2 class="font-display text-xl font-semibold text-steam">Your giftee</h2>
       <p class="text-lg">
         <strong>{{ assignment.receiver.firstName }}</strong>
-        · Steam: {{ assignment.receiver.steamUsername }}
+        · Steam:
+        <a
+          :href="assignment.receiver.steamProfileUrl"
+          target="_blank"
+          rel="noopener"
+          class="text-steam hover:underline"
+        >
+          {{ assignment.receiver.steamUsername }}
+        </a>
         <span v-if="assignment.receiver.discordTag"> · {{ assignment.receiver.discordTag }}</span>
       </p>
+      <ol class="list-decimal list-inside text-sm text-slate-300 space-y-1">
+        <li>Friend them on Steam using their profile link</li>
+        <li>Send the gift through Steam once they accept</li>
+      </ol>
       <p
         v-if="assignment.priceMin != null || assignment.priceMax != null"
         class="text-slate-400 text-sm"

@@ -8,7 +8,11 @@ const route = useRoute();
 const router = useRouter();
 
 const code = ref(String(route.params.code ?? "").toUpperCase());
-const swapInfo = ref<{ title: string; canJoin: boolean } | null>(null);
+const swapInfo = ref<{
+  title: string;
+  canJoin: boolean;
+  discordInviteUrl: string | null;
+} | null>(null);
 const config = ref<{ botInviteUrl: string; devTools?: boolean } | null>(null);
 const discordUser = ref<{
   displayName?: string | null;
@@ -29,6 +33,9 @@ const discordConnected = computed(() => !!discordUser.value);
 const devTools = computed(() => !!config.value?.devTools);
 const canShowJoinForm = computed(
   () => discordConnected.value || (devTools.value && !loadingMe.value),
+);
+const discordInviteUrl = computed(
+  () => swapInfo.value?.discordInviteUrl || config.value?.botInviteUrl || null,
 );
 
 onMounted(async () => {
@@ -75,9 +82,9 @@ async function loadMe() {
 async function loadSwap() {
   if (!code.value) return;
   try {
-    const res = await api.get<{ swap: { title: string; canJoin: boolean } }>(
-      `/api/swaps/${code.value}`,
-    );
+    const res = await api.get<{
+      swap: { title: string; canJoin: boolean; discordInviteUrl: string | null };
+    }>(`/api/swaps/${code.value}`);
     swapInfo.value = res.swap;
   } catch {
     swapInfo.value = null;
@@ -140,11 +147,11 @@ function goToMyPage() {
         <h2 class="font-semibold text-sm">Discord required</h2>
         <p class="text-slate-400 text-xs">
           Sign in with Discord to join. We'll remember you for 30 days in this browser.
-          Join our server so the bot can DM you when matches are ready.
+          Join the swap's Discord server so the bot can DM you when matches are ready.
         </p>
         <a
-          v-if="config?.botInviteUrl"
-          :href="config.botInviteUrl"
+          v-if="discordInviteUrl"
+          :href="discordInviteUrl"
           target="_blank"
           rel="noopener"
           class="inline-block text-sm text-[#5865F2] hover:underline"

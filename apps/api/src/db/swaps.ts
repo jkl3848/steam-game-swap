@@ -20,6 +20,8 @@ function docToSwap(id: string, data: FirebaseFirestore.DocumentData): Swap {
     priceMax: (data.priceMax as number) ?? null,
     status: data.status as SwapStatus,
     autoMatch: data.autoMatch as boolean,
+    discordInviteUrl: (data.discordInviteUrl as string) ?? null,
+    timeZone: (data.timeZone as string) ?? null,
     creatorUserId: data.creatorUserId as string,
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt),
@@ -147,6 +149,8 @@ export async function createSwap(data: Omit<Swap, "id" | "createdAt" | "updatedA
     priceMax: swap.priceMax,
     status: swap.status,
     autoMatch: swap.autoMatch,
+    discordInviteUrl: swap.discordInviteUrl,
+    timeZone: swap.timeZone,
     creatorUserId: swap.creatorUserId,
     createdAt: toTimestamp(now),
     updatedAt: toTimestamp(now),
@@ -165,6 +169,8 @@ export async function updateSwap(id: string, patch: Partial<Swap>): Promise<Swap
   if (patch.priceMax !== undefined) update.priceMax = patch.priceMax;
   if (patch.status !== undefined) update.status = patch.status;
   if (patch.autoMatch !== undefined) update.autoMatch = patch.autoMatch;
+  if (patch.discordInviteUrl !== undefined) update.discordInviteUrl = patch.discordInviteUrl;
+  if (patch.timeZone !== undefined) update.timeZone = patch.timeZone;
   await ref.update(update);
   const updated = await findSwapById(id);
   return updated!;
@@ -271,6 +277,32 @@ export async function updateParticipant(
   if (patch.secretTokenHash !== undefined) update.secretTokenHash = patch.secretTokenHash;
   await ref.update(update);
   return (await findParticipant(swapId, participantId))!;
+}
+
+export async function deleteParticipant(swapId: string, participantId: string): Promise<void> {
+  const db = getDb();
+  const pRef = db.collection("swaps").doc(swapId).collection("participants").doc(participantId);
+  const snap = await pRef.get();
+  if (!snap.exists) {
+    const err = new Error("Participant not found");
+    (err as Error & { statusCode: number }).statusCode = 404;
+    throw err;
+  }
+
+  const [wishlistSnap, blackouts] = await Promise.all([
+    pRef.collection("wishlist").get(),
+    listBlackouts(swapId),
+  ]);
+
+  const batch = db.batch();
+  wishlistSnap.docs.forEach((d) => batch.delete(d.ref));
+  for (const b of blackouts) {
+    if (b.participantAId === participantId || b.participantBId === participantId) {
+      batch.delete(db.collection("swaps").doc(swapId).collection("blackouts").doc(b.id));
+    }
+  }
+  batch.delete(pRef);
+  await batch.commit();
 }
 
 export async function listWishlist(swapId: string, participantId: string): Promise<WishlistItem[]> {
