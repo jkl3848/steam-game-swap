@@ -1,6 +1,11 @@
 import { getSwapFull, listParticipants, runMatchingTransaction } from "../db/swaps.js";
 import { findDerangementWithBlackouts } from "../lib/matcher.js";
-import { buildMatchDm, buildReminderDm, sendDirectMessage } from "./discord.js";
+import {
+  buildMatchDm,
+  buildReminderDm,
+  sendDirectMessage,
+  steamProfileUrl,
+} from "./discord.js";
 import { config } from "../config.js";
 
 export class MatchError extends Error {
@@ -9,6 +14,18 @@ export class MatchError extends Error {
     public code: string,
   ) {
     super(message);
+  }
+}
+
+function formatDeadline(date: Date, timeZone: string | null): string {
+  try {
+    return date.toLocaleString(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+      ...(timeZone ? { timeZone } : {}),
+    });
+  } catch {
+    return date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
   }
 }
 
@@ -74,11 +91,8 @@ export async function runSwapMatching(swapId: string, actorUserId?: string) {
       swapTitle: updated.swap.title,
       gifteeFirstName: receiver.firstName,
       steamUsername: receiver.steamUsername,
+      steamProfileUrl: steamProfileUrl(receiver.steamId, receiver.steamUsername),
       discordTag: receiver.discordTag,
-      wishlist: receiver.wishlistItems.map((w) => ({
-        name: w.name,
-        storeUrl: w.storeUrl,
-      })),
       priceMin: updated.swap.priceMin,
       priceMax: updated.swap.priceMax,
       myPageUrl,
@@ -118,7 +132,7 @@ export async function runGiftReminders() {
 
       const content = buildReminderDm({
         swapTitle: swap.title,
-        giftDeadline: swap.giftDeadline.toLocaleDateString(),
+        giftDeadline: formatDeadline(swap.giftDeadline, swap.timeZone),
         myPageUrl: `${config.webOrigin}/s/${swap.code}/me`,
       });
 

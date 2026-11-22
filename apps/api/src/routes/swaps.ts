@@ -18,6 +18,7 @@ import {
   findParticipantByDiscord,
   createParticipant,
   DuplicateDiscordParticipantError,
+  deleteParticipant,
   listParticipants,
   listWishlist,
   replaceWishlist,
@@ -38,7 +39,12 @@ import {
   requireSwapCreator,
 } from "../plugins/auth.js";
 import { resolveSteamId } from "../services/steam.js";
-import { buildSignupDm, sendDirectMessage } from "../services/discord.js";
+import {
+  buildCancelDm,
+  buildSignupDm,
+  sendDirectMessage,
+  steamProfileUrl,
+} from "../services/discord.js";
 import { MatchError, runSwapMatching } from "../services/swap-match.js";
 import { isMatchingPossible } from "../lib/matcher.js";
 import type { SwapStatus } from "../db/types.js";
@@ -122,6 +128,8 @@ export async function swapRoutes(app: FastifyInstance) {
       priceMin: body.priceMin ?? null,
       priceMax: body.priceMax ?? null,
       autoMatch: body.autoMatch,
+      discordInviteUrl: body.discordInviteUrl,
+      timeZone: body.timeZone ?? null,
       creatorUserId: request.creatorSession!.userId,
       status: "open",
     });
@@ -254,6 +262,7 @@ export async function swapRoutes(app: FastifyInstance) {
         priceMin: swap.priceMin,
         priceMax: swap.priceMax,
         rulesText: swap.rulesText,
+        discordInviteUrl: swap.discordInviteUrl ?? config.discord.botInviteUrl,
         participantCount: participants.length,
         canJoin: swap.status === "open",
       },
@@ -286,6 +295,8 @@ export async function swapRoutes(app: FastifyInstance) {
         priceMin: full.swap.priceMin,
         priceMax: full.swap.priceMax,
         autoMatch: full.swap.autoMatch,
+        discordInviteUrl: full.swap.discordInviteUrl,
+        timeZone: full.swap.timeZone,
         joinUrl: `${config.webOrigin}/join/${full.swap.code}`,
       },
       participants: full.participants.map((p) => ({
@@ -322,6 +333,10 @@ export async function swapRoutes(app: FastifyInstance) {
     const swap = await requireSwapCreator(request, code);
     const body = updateSwapSchema.parse(request.body);
 
+    if (body.status === "cancelled" && swap.status === "cancelled") {
+      return { swap };
+    }
+
     const updated = await updateSwap(swap.id, {
       ...(body.title && { title: body.title }),
       ...(body.rulesText !== undefined && { rulesText: body.rulesText }),
@@ -331,7 +346,18 @@ export async function swapRoutes(app: FastifyInstance) {
       ...(body.priceMax !== undefined && { priceMax: body.priceMax }),
       ...(body.status && { status: body.status as SwapStatus }),
       ...(body.autoMatch !== undefined && { autoMatch: body.autoMatch }),
+      ...(body.discordInviteUrl !== undefined && { discordInviteUrl: body.discordInviteUrl }),
+      ...(body.timeZone !== undefined && { timeZone: body.timeZone }),
     });
+
+    if (body.status === "cancelled" && swap.status !== "cancelled") {
+      const participants = await listParticipants(updated.id);
+      const cancelDm = buildCancelDm({ swapTitle: updated.title, code: updated.code });
+      for (const p of participants) {
+        if (!p.discordUserId) continue;
+        await sendDirectMessage(p.discordUserId, cancelDm);
+      }
+    }
 
     return { swap: updated };
   });
@@ -417,7 +443,11 @@ export async function swapRoutes(app: FastifyInstance) {
     if (!body.discordUserId.startsWith("dev:")) {
       await sendDirectMessage(
         body.discordUserId,
-        buildSignupDm({ swapTitle: swap.title, code: swap.code }),
+        buildSignupDm({
+          swapTitle: swap.title,
+          code: swap.code,
+          discordInviteUrl: swap.discordInviteUrl ?? config.discord.botInviteUrl,
+        }),
       );
     }
 
@@ -584,6 +614,8 @@ export async function swapRoutes(app: FastifyInstance) {
         receiver: {
           firstName: receiver.firstName,
           steamUsername: receiver.steamUsername,
+          steamId: receiver.steamId,
+          steamProfileUrl: steamProfileUrl(receiver.steamId, receiver.steamUsername),
           discordTag: receiver.discordTag,
         },
         wishlist: receiverWishlist,
@@ -646,6 +678,23 @@ export async function swapRoutes(app: FastifyInstance) {
       }
       throw e;
     }
+  });
+
+  app.delete("/swaps/:code/participants/:participantId", async (request) => {
+    const { code, participantId } = request.params as {
+      code: string;
+      participantId: string;
+    };
+    const swap = await requireSwapCreator(request, code);
+
+    if (swap.status !== "open" && swap.status !== "locked") {
+      const err = new Error("Can only remove participants before matching");
+      (err as Error & { statusCode: number }).statusCode = 400;
+      throw err;
+    }
+
+    await deleteParticipant(swap.id, participantId);
+    return { ok: true };
   });
 
   app.post("/swaps/:code/participants/:participantId/regenerate-token", async (request) => {

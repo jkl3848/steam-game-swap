@@ -24,8 +24,21 @@ type Assignment = {
   sentAt: string | null;
 };
 
+type SwapManage = {
+  id: string;
+  code: string;
+  title: string;
+  status: string;
+  startDate: string;
+  giftDeadline: string;
+  autoMatch: boolean;
+  discordInviteUrl: string | null;
+  timeZone: string | null;
+  joinUrl: string;
+};
+
 const data = ref<{
-  swap: Record<string, unknown>;
+  swap: SwapManage;
   participants: Participant[];
   blackouts: Array<{ id: string; participantAId: string; participantBId: string }>;
   matchingPossible: boolean;
@@ -35,6 +48,7 @@ const error = ref("");
 const blackoutA = ref("");
 const blackoutB = ref("");
 const matchError = ref("");
+const actionError = ref("");
 const devTools = ref(false);
 const testName = ref("");
 const testSteam = ref("");
@@ -55,18 +69,63 @@ async function load() {
   }
 }
 
+function formatInstant(iso: string, timeZone: string | null): string {
+  const d = new Date(iso);
+  try {
+    const formatted = d.toLocaleString(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+      ...(timeZone ? { timeZone } : {}),
+    });
+    return timeZone ? `${formatted} (${timeZone})` : formatted;
+  } catch {
+    return d.toLocaleString();
+  }
+}
+
 async function lockSignups() {
+  actionError.value = "";
   await api.patch(`/api/swaps/${code.value}`, { status: "locked" });
   await load();
 }
 
 async function runMatch() {
   matchError.value = "";
+  if (data.value?.swap.autoMatch) {
+    const ok = window.confirm(
+      "Auto-match is scheduled for the match time. You can run it now instead. Continue?",
+    );
+    if (!ok) return;
+  }
   try {
     await api.post(`/api/swaps/${code.value}/match`);
     await load();
   } catch (e) {
     matchError.value = e instanceof Error ? e.message : "Match failed";
+  }
+}
+
+async function cancelSwap() {
+  actionError.value = "";
+  const ok = window.confirm("Cancel this swap? This cannot be undone.");
+  if (!ok) return;
+  try {
+    await api.patch(`/api/swaps/${code.value}`, { status: "cancelled" });
+    await load();
+  } catch (e) {
+    actionError.value = e instanceof Error ? e.message : "Cancel failed";
+  }
+}
+
+async function removeParticipant(p: Participant) {
+  actionError.value = "";
+  const ok = window.confirm(`Remove ${p.firstName} from this swap?`);
+  if (!ok) return;
+  try {
+    await api.delete(`/api/swaps/${code.value}/participants/${p.id}`);
+    await load();
+  } catch (e) {
+    actionError.value = e instanceof Error ? e.message : "Remove failed";
   }
 }
 
@@ -160,6 +219,16 @@ const matchRows = computed(() => {
 const joinUrl = computed(() =>
   data.value ? `${window.location.origin}/join/${code.value}` : "",
 );
+
+const canRemoveParticipants = computed(() => {
+  const status = data.value?.swap.status;
+  return status === "open" || status === "locked";
+});
+
+const canRunMatch = computed(() => {
+  const status = data.value?.swap.status;
+  return status === "open" || status === "locked";
+});
 </script>
 
 <template>
@@ -173,8 +242,34 @@ const joinUrl = computed(() =>
           Code: <span class="font-mono text-steam">{{ code }}</span>
           <StatusBadge :status="String(data.swap.status)" class="ml-2" />
         </p>
+        <dl class="mt-3 text-sm text-slate-400 space-y-1">
+          <div>
+            <dt class="inline text-slate-500">Match:</dt>
+            {{ " " }}
+            <dd class="inline">{{ formatInstant(data.swap.startDate, data.swap.timeZone) }}</dd>
+          </div>
+          <div>
+            <dt class="inline text-slate-500">Deadline:</dt>
+            {{ " " }}
+            <dd class="inline">{{ formatInstant(data.swap.giftDeadline, data.swap.timeZone) }}</dd>
+          </div>
+          <div v-if="data.swap.discordInviteUrl">
+            <dt class="inline text-slate-500">Discord:</dt>
+            {{ " " }}
+            <dd class="inline">
+              <a
+                :href="data.swap.discordInviteUrl"
+                target="_blank"
+                rel="noopener"
+                class="text-[#5865F2] hover:underline break-all"
+              >
+                {{ data.swap.discordInviteUrl }}
+              </a>
+            </dd>
+          </div>
+        </dl>
       </div>
-      <div class="flex gap-2">
+      <div class="flex flex-wrap gap-2">
         <button
           v-if="data.swap.status === 'open'"
           type="button"
@@ -184,7 +279,7 @@ const joinUrl = computed(() =>
           Lock signups
         </button>
         <button
-          v-if="data.swap.status !== 'matched'"
+          v-if="canRunMatch"
           type="button"
           class="px-3 py-1.5 rounded bg-steam text-slate-950 text-sm font-semibold disabled:opacity-50"
           :disabled="!data.matchingPossible || data.participants.length < 3"
@@ -192,10 +287,26 @@ const joinUrl = computed(() =>
         >
           Run matching
         </button>
+        <button
+          v-if="data.swap.status !== 'cancelled'"
+          type="button"
+          class="px-3 py-1.5 rounded border border-red-500/40 text-red-300 text-sm hover:bg-red-500/10"
+          @click="cancelSwap"
+        >
+          Cancel swap
+        </button>
       </div>
     </header>
 
+    <p
+      v-if="canRunMatch && data.swap.autoMatch"
+      class="text-amber-300/90 text-sm"
+    >
+      Auto-match is scheduled for the match time. You can run it now instead.
+    </p>
+
     <p v-if="matchError" class="text-red-400 text-sm">{{ matchError }}</p>
+    <p v-if="actionError" class="text-red-400 text-sm">{{ actionError }}</p>
 
     <section v-if="devTools" class="p-4 rounded-xl border border-amber-500/30 bg-amber-500/5 space-y-3">
       <h2 class="font-display text-lg font-semibold">Test with one account</h2>
@@ -276,7 +387,7 @@ const joinUrl = computed(() =>
             <th class="pb-2">Discord</th>
             <th class="pb-2">Wishlist</th>
             <th v-if="data.swap.status === 'matched'" class="pb-2">Sent</th>
-            <th v-if="devTools" class="pb-2"></th>
+            <th v-if="canRemoveParticipants || devTools" class="pb-2" />
           </tr>
         </thead>
         <tbody>
@@ -295,9 +406,22 @@ const joinUrl = computed(() =>
             <td v-if="data.swap.status === 'matched'" class="py-2">
               {{ p.giftSent ? "✓" : "—" }}
             </td>
-            <td v-if="devTools" class="py-2 text-right">
-              <button type="button" class="text-steam hover:underline" @click="openAs(p.id)">
+            <td v-if="canRemoveParticipants || devTools" class="py-2 text-right space-x-3">
+              <button
+                v-if="devTools"
+                type="button"
+                class="text-steam hover:underline text-xs"
+                @click="openAs(p.id)"
+              >
                 Open as them
+              </button>
+              <button
+                v-if="canRemoveParticipants"
+                type="button"
+                class="text-red-400 hover:text-red-300 text-xs"
+                @click="removeParticipant(p)"
+              >
+                Remove
               </button>
             </td>
           </tr>
@@ -305,7 +429,7 @@ const joinUrl = computed(() =>
       </table>
     </section>
 
-    <section v-if="data.swap.status !== 'matched'" class="p-4 rounded-xl border border-white/10">
+    <section v-if="canRunMatch" class="p-4 rounded-xl border border-white/10">
       <h2 class="font-display text-lg font-semibold mb-3">Blackouts</h2>
       <p class="text-slate-500 text-sm mb-3">Prevent two people from being matched together.</p>
       <div class="flex flex-wrap gap-2 mb-3">

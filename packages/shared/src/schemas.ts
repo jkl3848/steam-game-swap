@@ -17,6 +17,8 @@ export const createSwapSchema = z.object({
   priceMin: optionalPrice,
   priceMax: optionalPrice,
   autoMatch: z.boolean().default(true),
+  discordInviteUrl: z.string().url().max(500),
+  timeZone: z.string().min(1).max(100).optional(),
 });
 
 export const joinSwapSchema = z.object({
@@ -69,6 +71,8 @@ export const updateSwapSchema = z.object({
   priceMax: z.number().int().min(0).nullable().optional(),
   status: z.enum(["open", "locked", "cancelled"]).optional(),
   autoMatch: z.boolean().optional(),
+  discordInviteUrl: z.string().url().max(500).optional(),
+  timeZone: z.string().min(1).max(100).nullable().optional(),
 });
 
 export type CreateSwapInput = z.infer<typeof createSwapSchema>;
