@@ -1,6 +1,23 @@
 import { config } from "../config.js";
 
 const DISCORD_API = "https://discord.com/api/v10";
+const DISCORD_USER_AGENT = "DiscordBot (https://steam-game-swap-dev.web.app, 1.0)";
+
+function discordHeaders(): Record<string, string> {
+  return {
+    Authorization: `Bot ${config.discord.botToken}`,
+    "Content-Type": "application/json",
+    "User-Agent": DISCORD_USER_AGENT,
+  };
+}
+
+async function discordError(res: Response): Promise<string> {
+  try {
+    return (await res.text()).slice(0, 300);
+  } catch {
+    return "";
+  }
+}
 
 export async function sendDirectMessage(
   discordUserId: string,
@@ -15,30 +32,26 @@ export async function sendDirectMessage(
   try {
     const channelRes = await fetch(`${DISCORD_API}/users/@me/channels`, {
       method: "POST",
-      headers: {
-        Authorization: `Bot ${config.discord.botToken}`,
-        "Content-Type": "application/json",
-      },
+      headers: discordHeaders(),
       body: JSON.stringify({ recipient_id: discordUserId }),
     });
 
     if (!channelRes.ok) {
-      console.error(`Failed to open DM channel: ${channelRes.status}`);
+      console.error(
+        `Failed to open DM channel: ${channelRes.status} ${await discordError(channelRes)}`,
+      );
       return false;
     }
 
     const channel = (await channelRes.json()) as { id: string };
     const msgRes = await fetch(`${DISCORD_API}/channels/${channel.id}/messages`, {
       method: "POST",
-      headers: {
-        Authorization: `Bot ${config.discord.botToken}`,
-        "Content-Type": "application/json",
-      },
+      headers: discordHeaders(),
       body: JSON.stringify({ content }),
     });
 
     if (!msgRes.ok) {
-      console.error(`Failed to send DM: ${msgRes.status}`);
+      console.error(`Failed to send DM: ${msgRes.status} ${await discordError(msgRes)}`);
       return false;
     }
 
