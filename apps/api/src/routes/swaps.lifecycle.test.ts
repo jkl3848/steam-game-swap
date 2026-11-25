@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../app.js";
+import { upsertUser } from "../db/users.js";
 import { mergeSession } from "../lib/session.js";
 import {
   clearFirestoreEmulator,
@@ -294,6 +295,56 @@ describe.skipIf(!hasEmulator)("swap lifecycle", () => {
       });
       expect(match.statusCode).toBe(400);
       expect(match.json().error).toMatch(/at least 3/i);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("lists swaps you created and swaps you joined", async () => {
+    const app = await buildApp();
+    const me = await upsertUser({
+      discordId: "discord-me",
+      discordTag: "me",
+      displayName: "Me",
+      avatarUrl: null,
+    });
+    const other = await upsertUser({
+      discordId: "discord-other",
+      discordTag: "other",
+      displayName: "Other",
+      avatarUrl: null,
+    });
+    const mine = await creatorCookie(me.id);
+    const theirs = await creatorCookie(other.id);
+    try {
+      const created = await createOpenSwap(app, mine, { title: "Mine" });
+      const joined = await createOpenSwap(app, theirs, { title: "Theirs" });
+      const join = await app.inject({
+        method: "POST",
+        url: `/api/swaps/${joined.code}/join`,
+        headers: { cookie: mine },
+        payload: {
+          firstName: "Me",
+          steamUsername: "me_steam",
+          wishlist: [],
+        },
+      });
+      expect(join.statusCode).toBe(200);
+
+      const res = await app.inject({
+        method: "GET",
+        url: "/api/swaps/mine",
+        headers: { cookie: mine },
+      });
+      expect(res.statusCode).toBe(200);
+      const swaps = res.json().swaps as Array<{ code: string; role: string }>;
+      expect(swaps).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ code: created.code, role: "creator", title: "Mine" }),
+          expect.objectContaining({ code: joined.code, role: "participant", title: "Theirs" }),
+        ]),
+      );
+      expect(swaps).toHaveLength(2);
     } finally {
       await app.close();
     }
