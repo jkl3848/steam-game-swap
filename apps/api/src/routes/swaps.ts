@@ -70,9 +70,14 @@ export async function swapRoutes(app: FastifyInstance) {
     const userId = request.creatorSession!.userId;
     const user = await findUserById(userId);
     const created = await findSwapsByCreator(userId);
-    const joined = user?.discordId
-      ? await findSwapsByDiscordParticipant(user.discordId)
-      : [];
+    let joined: Awaited<ReturnType<typeof findSwapsByDiscordParticipant>> = [];
+    if (user?.discordId) {
+      try {
+        joined = await findSwapsByDiscordParticipant(user.discordId);
+      } catch (err) {
+        request.log.error({ err }, "failed to load joined swaps");
+      }
+    }
 
     const createdIds = new Set(created.map((s) => s.id));
     const swaps = [

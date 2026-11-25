@@ -14,11 +14,14 @@ type Swap = {
 
 const swaps = ref<Swap[]>([]);
 const loading = ref(true);
+const error = ref("");
 
 onMounted(async () => {
   try {
     const res = await api.get<{ swaps: Swap[] }>("/api/swaps/mine");
-    swaps.value = res.swaps;
+    swaps.value = res.swaps ?? [];
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : "Could not load your swaps";
   } finally {
     loading.value = false;
   }
@@ -46,6 +49,7 @@ onMounted(async () => {
     </div>
 
     <p v-if="loading" class="text-slate-500">Loading...</p>
+    <p v-else-if="error" class="text-red-300">{{ error }}</p>
     <p v-else-if="!swaps.length" class="text-slate-500">
       No swaps yet.
       <RouterLink to="/join" class="text-steam hover:underline">Join one</RouterLink>

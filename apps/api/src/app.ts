@@ -50,7 +50,7 @@ export async function buildApp() {
   // `app.register(authPlugin)` would encapsulate the hooks and silently skip them.
   await authPlugin(app);
 
-  app.setErrorHandler((error: Error & { statusCode?: number; code?: string; cause?: unknown }, _request, reply) => {
+  app.setErrorHandler((error: Error & { statusCode?: number; code?: string; cause?: unknown }, request, reply) => {
     const zod = error instanceof ZodError
       ? error
       : error.cause instanceof ZodError
@@ -62,6 +62,9 @@ export async function buildApp() {
       return;
     }
     const statusCode = error.statusCode ?? 500;
+    if (statusCode >= 500) {
+      request.log.error({ err: error }, error.message);
+    }
     reply.status(statusCode).send({
       error: error.message,
       code: error.code,

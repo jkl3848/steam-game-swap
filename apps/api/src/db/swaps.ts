@@ -107,13 +107,18 @@ export async function findSwapsByCreator(creatorUserId: string): Promise<Array<S
   return results;
 }
 
-/** Swaps where this Discord user is a participant (collection-group query). */
+/**
+ * Swaps where this Discord user is a participant (collection-group query).
+ * orderBy swapId is required so production uses the composite collection-group
+ * index on (discordUserId, swapId). An equality-only query does not, and fails.
+ */
 export async function findSwapsByDiscordParticipant(
   discordUserId: string,
 ): Promise<Array<Swap & { participantId: string; participantCount: number }>> {
   const q = await getDb()
     .collectionGroup("participants")
     .where("discordUserId", "==", discordUserId)
+    .orderBy("swapId", "asc")
     .get();
 
   const results: Array<Swap & { participantId: string; participantCount: number }> = [];
