@@ -45,13 +45,15 @@ describe("buildMatchDm", () => {
 });
 
 describe("buildSignupDm", () => {
-  it("includes the per-swap discord invite when provided", () => {
+  it("confirms the signup without a discord server link", () => {
     const dm = buildSignupDm({
       swapTitle: "Holiday Swap",
       code: "ABCD12",
-      discordInviteUrl: "https://discord.gg/swap",
     });
-    expect(dm).toContain("https://discord.gg/swap");
+    expect(dm).toContain("You're signed up for **Holiday Swap**");
+    expect(dm).toContain("`ABCD12`");
+    expect(dm).not.toContain("discord.gg");
+    expect(dm).not.toContain("Stay in the swap Discord");
   });
 });
 

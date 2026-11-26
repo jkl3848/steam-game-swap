@@ -18,7 +18,7 @@ export async function steamRoutes(app: FastifyInstance) {
     return { results };
   });
 
-  app.post("/swaps/:code/me/wishlist/import", async (request) => {
+  app.post("/swaps/:code/me/wishlist/import", async (request, reply) => {
     const { code } = request.params as { code: string };
     const swap = await findSwapByCode(code);
     if (!swap) {
@@ -27,7 +27,7 @@ export async function steamRoutes(app: FastifyInstance) {
       throw err;
     }
 
-    const participant = await requireParticipantForSwap(request, swap.id);
+    const participant = await requireParticipantForSwap(request, swap.id, reply);
     let steamId =
       participant.steamId ?? (await resolveSteamId(participant.steamUsername));
     if (!steamId) {

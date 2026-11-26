@@ -337,14 +337,96 @@ describe.skipIf(!hasEmulator)("swap lifecycle", () => {
         headers: { cookie: mine },
       });
       expect(res.statusCode).toBe(200);
-      const swaps = res.json().swaps as Array<{ code: string; role: string }>;
-      expect(swaps).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ code: created.code, role: "creator", title: "Mine" }),
-          expect.objectContaining({ code: joined.code, role: "participant", title: "Theirs" }),
-        ]),
-      );
-      expect(swaps).toHaveLength(2);
+      const body = res.json() as {
+        created: Array<{ code: string; title: string }>;
+        joined: Array<{ code: string; title: string; match: unknown }>;
+      };
+      expect(body.created).toEqual([
+        expect.objectContaining({ code: created.code, title: "Mine" }),
+      ]);
+      expect(body.joined).toEqual([
+        expect.objectContaining({ code: joined.code, title: "Theirs", match: null }),
+      ]);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("reopens your page and match profile after you lose the secret link", async () => {
+    const app = await buildApp();
+    const me = await upsertUser({
+      discordId: "discord-host",
+      discordTag: "host",
+      displayName: "Host",
+      avatarUrl: null,
+    });
+    const cookie = await creatorCookie(me.id);
+    try {
+      const swap = await createOpenSwap(app, cookie, { title: "Hosted" });
+      const join = await app.inject({
+        method: "POST",
+        url: `/api/swaps/${swap.code}/join`,
+        headers: { cookie },
+        payload: {
+          firstName: "Host",
+          steamUsername: "host_steam",
+          wishlist: [],
+        },
+      });
+      expect(join.statusCode).toBe(200);
+
+      await joinAs(app, swap.code, {
+        firstName: "Pat",
+        steamUsername: "pat_steam",
+        discordUserId: "dev:pat",
+      });
+      await joinAs(app, swap.code, {
+        firstName: "Sam",
+        steamUsername: "sam_steam",
+        discordUserId: "dev:sam",
+      });
+
+      const page = await app.inject({
+        method: "GET",
+        url: `/api/swaps/${swap.code}/me`,
+        headers: { cookie },
+      });
+      expect(page.statusCode).toBe(200);
+      expect(page.json().participant.firstName).toBe("Host");
+
+      const match = await app.inject({
+        method: "POST",
+        url: `/api/swaps/${swap.code}/match`,
+        headers: { cookie },
+      });
+      expect(match.statusCode).toBe(200);
+
+      const mine = await app.inject({
+        method: "GET",
+        url: "/api/swaps/mine",
+        headers: { cookie },
+      });
+      expect(mine.statusCode).toBe(200);
+      const body = mine.json() as {
+        created: Array<{ code: string }>;
+        joined: Array<{
+          code: string;
+          match: { firstName: string; steamProfileUrl: string } | null;
+        }>;
+      };
+      expect(body.created.map((s) => s.code)).toContain(swap.code);
+      const row = body.joined.find((s) => s.code === swap.code);
+      expect(row?.match?.firstName).toMatch(/Pat|Sam/);
+      expect(row?.match?.steamProfileUrl).toMatch(/^https:\/\/steamcommunity.com\//);
+
+      const manage = await app.inject({
+        method: "GET",
+        url: `/api/swaps/${swap.code}/manage`,
+        headers: { cookie },
+      });
+      expect(manage.statusCode).toBe(200);
+      expect(manage.json().viewer.participantId).toBeTruthy();
+      expect(manage.json().viewer.match.steamProfileUrl).toBe(row?.match?.steamProfileUrl);
     } finally {
       await app.close();
     }
