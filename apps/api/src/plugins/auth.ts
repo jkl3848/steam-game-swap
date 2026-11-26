@@ -1,6 +1,8 @@
-import type { FastifyInstance, FastifyRequest } from "fastify";
-import { findSwapByCode, findParticipant } from "../db/swaps.js";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { findUserById } from "../db/users.js";
+import { findSwapByCode, findParticipant, findParticipantByDiscord } from "../db/swaps.js";
 import {
+  setSessionCookie,
   sessionCookieFromRequest,
   sessionsFromToken,
   type CreatorSession,
@@ -57,21 +59,44 @@ export async function requireSwapCreator(
   return swap;
 }
 
+function unauthorized(): never {
+  const err = new Error("Unauthorized");
+  (err as Error & { statusCode: number }).statusCode = 401;
+  throw err;
+}
+
+/**
+ * The secret profile link is easy to lose. A Discord login that joined this
+ * swap can reopen it. An existing participant cookie still wins, so dev
+ * "open as them" is unchanged.
+ */
 export async function requireParticipantForSwap(
   request: FastifyRequest,
   swapId: string,
+  reply?: FastifyReply,
 ) {
   const session = request.participantSession;
-  if (!session || session.swapId !== swapId) {
-    const err = new Error("Unauthorized");
-    (err as Error & { statusCode: number }).statusCode = 401;
-    throw err;
+  if (session?.swapId === swapId) {
+    const participant = await findParticipant(swapId, session.participantId);
+    if (participant) return participant;
   }
-  const participant = await findParticipant(swapId, session.participantId);
-  if (!participant) {
-    const err = new Error("Participant not found");
-    (err as Error & { statusCode: number }).statusCode = 404;
-    throw err;
+
+  if (request.creatorSession) {
+    const user = await findUserById(request.creatorSession.userId);
+    if (user?.discordId) {
+      const participant = await findParticipantByDiscord(swapId, user.discordId);
+      if (participant) {
+        if (reply) {
+          await setSessionCookie(request, reply, {
+            type: "participant",
+            participantId: participant.id,
+            swapId,
+          });
+        }
+        return participant;
+      }
+    }
   }
-  return participant;
+
+  unauthorized();
 }

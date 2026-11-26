@@ -57,6 +57,14 @@ describe("ManageSwapView matches", () => {
             { giverId: "p1", receiverId: "p2", sentAt: null },
             { giverId: "p2", receiverId: "p1", sentAt: "2026-12-05T00:00:00.000Z" },
           ],
+          viewer: {
+            participantId: "p1",
+            match: {
+              firstName: "Bob",
+              steamUsername: "bob_steam",
+              steamProfileUrl: "https://steamcommunity.com/id/bob_steam",
+            },
+          },
         };
       }
       throw new Error(`unexpected ${path}`);
@@ -66,6 +74,7 @@ describe("ManageSwapView matches", () => {
       history: createMemoryHistory(),
       routes: [
         { path: "/swap/:code/manage", component: ManageSwapView },
+        { path: "/s/:code/me/:token?", component: { template: "<div />" } },
         { path: "/", component: { template: "<div />" } },
       ],
     });
@@ -82,5 +91,8 @@ describe("ManageSwapView matches", () => {
     expect(wrapper.text()).toContain("Bob");
     expect(wrapper.text()).toContain("bob_steam");
     expect(wrapper.text()).toContain("→");
+    expect(wrapper.text()).toContain("Your spot in this swap");
+    expect(wrapper.find('a[href="/s/ABCD12/me"]').exists()).toBe(true);
+    expect(wrapper.find('a[href="https://steamcommunity.com/id/bob_steam"]').exists()).toBe(true);
   });
 });

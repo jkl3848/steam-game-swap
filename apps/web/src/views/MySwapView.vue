@@ -89,17 +89,17 @@ async function markSent() {
       <h2 class="font-display text-xl font-semibold text-steam">Your giftee</h2>
       <p class="text-lg">
         <strong>{{ assignment.receiver.firstName }}</strong>
-        · Steam:
-        <a
-          :href="assignment.receiver.steamProfileUrl"
-          target="_blank"
-          rel="noopener"
-          class="text-steam hover:underline"
-        >
-          {{ assignment.receiver.steamUsername }}
-        </a>
+        · Steam: {{ assignment.receiver.steamUsername }}
         <span v-if="assignment.receiver.discordTag"> · {{ assignment.receiver.discordTag }}</span>
       </p>
+      <a
+        :href="assignment.receiver.steamProfileUrl"
+        target="_blank"
+        rel="noopener"
+        class="inline-block px-4 py-2 rounded-lg bg-steam text-slate-950 font-semibold"
+      >
+        Open match profile
+      </a>
       <ol class="list-decimal list-inside text-sm text-slate-300 space-y-1">
         <li>Friend them on Steam using their profile link</li>
         <li>Send the gift through Steam once they accept</li>

@@ -124,19 +124,11 @@ export function buildReminderDm(params: {
   ].join("\n");
 }
 
-export function buildSignupDm(params: {
-  swapTitle: string;
-  code: string;
-  discordInviteUrl?: string | null;
-}): string {
-  const lines = [
+export function buildSignupDm(params: { swapTitle: string; code: string }): string {
+  return [
     `✅ You're signed up for **${params.swapTitle}** (\`${params.code}\`).`,
     `We'll DM you again when matches are made!`,
-  ];
-  if (params.discordInviteUrl) {
-    lines.push(``, `Stay in the swap Discord: ${params.discordInviteUrl}`);
-  }
-  return lines.join("\n");
+  ].join("\n");
 }
 
 export function buildCancelDm(params: { swapTitle: string; code: string }): string {

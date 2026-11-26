@@ -8,18 +8,26 @@ type Swap = {
   title: string;
   status: string;
   participantCount: number;
-  startDate: string;
-  role: "creator" | "participant";
 };
 
-const swaps = ref<Swap[]>([]);
+type MatchLink = {
+  firstName: string;
+  steamUsername: string;
+  steamProfileUrl: string;
+};
+
+type JoinedSwap = Swap & { match: MatchLink | null };
+
+const created = ref<Swap[]>([]);
+const joined = ref<JoinedSwap[]>([]);
 const loading = ref(true);
 const error = ref("");
 
 onMounted(async () => {
   try {
-    const res = await api.get<{ swaps: Swap[] }>("/api/swaps/mine");
-    swaps.value = res.swaps ?? [];
+    const res = await api.get<{ created: Swap[]; joined: JoinedSwap[] }>("/api/swaps/mine");
+    created.value = res.created ?? [];
+    joined.value = res.joined ?? [];
   } catch (e) {
     error.value = e instanceof Error ? e.message : "Could not load your swaps";
   } finally {
@@ -29,7 +37,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-8">
     <div class="flex justify-between items-center gap-4 flex-wrap">
       <h1 class="font-display text-3xl font-bold">Your swaps</h1>
       <div class="flex gap-2">
@@ -50,48 +58,83 @@ onMounted(async () => {
 
     <p v-if="loading" class="text-slate-500">Loading...</p>
     <p v-else-if="error" class="text-red-300">{{ error }}</p>
-    <p v-else-if="!swaps.length" class="text-slate-500">
-      No swaps yet.
-      <RouterLink to="/join" class="text-steam hover:underline">Join one</RouterLink>
-      or
-      <RouterLink to="/create" class="text-steam hover:underline">create your own</RouterLink>.
-    </p>
+    <template v-else>
+      <section class="space-y-3">
+        <h2 class="font-display text-xl font-semibold">Swaps I'm in</h2>
+        <p v-if="!joined.length" class="text-slate-500 text-sm">
+          You haven't joined a swap yet.
+          <RouterLink to="/join" class="text-steam hover:underline">Join one</RouterLink>
+          to get your page back here if you lose the link.
+        </p>
+        <ul v-else class="space-y-3">
+          <li
+            v-for="swap in joined"
+            :key="swap.code"
+            class="p-4 rounded-xl border border-white/10 bg-slate-900/50 flex justify-between items-center gap-3 flex-wrap"
+          >
+            <div>
+              <h3 class="font-semibold">{{ swap.title }}</h3>
+              <p class="text-slate-500 text-sm">
+                Code: <span class="font-mono text-steam">{{ swap.code }}</span>
+                · {{ swap.participantCount }} joined
+                <template v-if="swap.match">
+                  · gifting for {{ swap.match.firstName }}
+                </template>
+              </p>
+            </div>
+            <div class="flex items-center gap-3">
+              <StatusBadge :status="swap.status" />
+              <RouterLink
+                :to="`/s/${swap.code}/me`"
+                class="text-sm text-steam hover:underline"
+              >
+                My page
+              </RouterLink>
+              <a
+                v-if="swap.match"
+                :href="swap.match.steamProfileUrl"
+                target="_blank"
+                rel="noopener"
+                class="text-sm text-steam hover:underline"
+              >
+                Match profile
+              </a>
+            </div>
+          </li>
+        </ul>
+      </section>
 
-    <ul v-else class="space-y-3">
-      <li
-        v-for="swap in swaps"
-        :key="swap.code"
-        class="p-4 rounded-xl border border-white/10 bg-slate-900/50 flex justify-between items-center gap-3 flex-wrap"
-      >
-        <div>
-          <h2 class="font-semibold">{{ swap.title }}</h2>
-          <p class="text-slate-500 text-sm">
-            Code: <span class="font-mono text-steam">{{ swap.code }}</span>
-            · {{ swap.participantCount }} joined
-            ·
-            <span class="text-slate-400">{{
-              swap.role === "creator" ? "Organizing" : "Joined"
-            }}</span>
-          </p>
-        </div>
-        <div class="flex items-center gap-3">
-          <StatusBadge :status="swap.status" />
-          <RouterLink
-            v-if="swap.role === 'creator'"
-            :to="`/swap/${swap.code}/manage`"
-            class="text-sm text-steam hover:underline"
+      <section class="space-y-3">
+        <h2 class="font-display text-xl font-semibold">Swaps I made</h2>
+        <p v-if="!created.length" class="text-slate-500 text-sm">
+          You haven't created a swap yet.
+          <RouterLink to="/create" class="text-steam hover:underline">Create one</RouterLink>.
+        </p>
+        <ul v-else class="space-y-3">
+          <li
+            v-for="swap in created"
+            :key="swap.code"
+            class="p-4 rounded-xl border border-white/10 bg-slate-900/50 flex justify-between items-center gap-3 flex-wrap"
           >
-            Manage
-          </RouterLink>
-          <RouterLink
-            v-else
-            :to="`/s/${swap.code}/me`"
-            class="text-sm text-steam hover:underline"
-          >
-            My page
-          </RouterLink>
-        </div>
-      </li>
-    </ul>
+            <div>
+              <h3 class="font-semibold">{{ swap.title }}</h3>
+              <p class="text-slate-500 text-sm">
+                Code: <span class="font-mono text-steam">{{ swap.code }}</span>
+                · {{ swap.participantCount }} joined
+              </p>
+            </div>
+            <div class="flex items-center gap-3">
+              <StatusBadge :status="swap.status" />
+              <RouterLink
+                :to="`/swap/${swap.code}/manage`"
+                class="text-sm text-steam hover:underline"
+              >
+                Manage
+              </RouterLink>
+            </div>
+          </li>
+        </ul>
+      </section>
+    </template>
   </div>
 </template>

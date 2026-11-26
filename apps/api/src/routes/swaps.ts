@@ -64,53 +64,146 @@ function canAddParticipants(status: string) {
   return status === "open" || status === "locked";
 }
 
+type SwapListItem = {
+  id: string;
+  code: string;
+  title: string;
+  status: string;
+  startDate: Date;
+  giftDeadline: Date;
+  participantCount: number;
+  autoMatch: boolean;
+};
+
+type MatchLink = {
+  firstName: string;
+  steamUsername: string;
+  steamProfileUrl: string;
+};
+
+function swapListItem(swap: {
+  id: string;
+  code: string;
+  title: string;
+  status: string;
+  startDate: Date;
+  giftDeadline: Date;
+  participantCount: number;
+  autoMatch: boolean;
+}): SwapListItem {
+  return {
+    id: swap.id,
+    code: swap.code,
+    title: swap.title,
+    status: swap.status,
+    startDate: swap.startDate,
+    giftDeadline: swap.giftDeadline,
+    participantCount: swap.participantCount,
+    autoMatch: swap.autoMatch,
+  };
+}
+
+async function viewerInSwap(
+  request: { creatorSession?: { userId: string } },
+  full: {
+    swap: { status: string };
+    participants: Array<{
+      id: string;
+      discordUserId: string | null;
+      firstName: string;
+      steamUsername: string;
+      steamId: string | null;
+    }>;
+    assignments: Array<{ giverId: string; receiverId: string }>;
+  },
+): Promise<{ participantId: string | null; match: MatchLink | null }> {
+  const user = request.creatorSession
+    ? await findUserById(request.creatorSession.userId)
+    : null;
+  const me = user?.discordId
+    ? full.participants.find((p) => p.discordUserId === user.discordId) ?? null
+    : null;
+  if (!me) return { participantId: null, match: null };
+
+  const matched = full.swap.status === "matched" || full.swap.status === "completed";
+  if (!matched) return { participantId: me.id, match: null };
+
+  const assignment = full.assignments.find((a) => a.giverId === me.id);
+  const receiver = assignment
+    ? full.participants.find((p) => p.id === assignment.receiverId)
+    : null;
+  return {
+    participantId: me.id,
+    match: receiver
+      ? {
+          firstName: receiver.firstName,
+          steamUsername: receiver.steamUsername,
+          steamProfileUrl: steamProfileUrl(receiver.steamId, receiver.steamUsername),
+        }
+      : null,
+  };
+}
+
+async function matchLinkFor(
+  swapId: string,
+  status: string,
+  participantId: string,
+): Promise<MatchLink | null> {
+  if (status !== "matched" && status !== "completed") return null;
+  const assignment = await findAssignmentByGiver(swapId, participantId);
+  if (!assignment) return null;
+  const receiver = await findParticipant(swapId, assignment.receiverId);
+  if (!receiver) return null;
+  return {
+    firstName: receiver.firstName,
+    steamUsername: receiver.steamUsername,
+    steamProfileUrl: steamProfileUrl(receiver.steamId, receiver.steamUsername),
+  };
+}
+
 export async function swapRoutes(app: FastifyInstance) {
   app.get("/swaps/mine", async (request) => {
     requireCreator(request);
     const userId = request.creatorSession!.userId;
     const user = await findUserById(userId);
-    const created = await findSwapsByCreator(userId);
-    let joined: Awaited<ReturnType<typeof findSwapsByDiscordParticipant>> = [];
+    const createdSwaps = await findSwapsByCreator(userId);
+
+    const joined: Array<SwapListItem & { match: MatchLink | null }> = [];
+    const seenJoined = new Set<string>();
+
+    async function addJoined(
+      swap: SwapListItem & { id: string },
+      participantId: string,
+    ) {
+      if (seenJoined.has(swap.id)) return;
+      seenJoined.add(swap.id);
+      joined.push({
+        ...swapListItem(swap),
+        match: await matchLinkFor(swap.id, swap.status, participantId),
+      });
+    }
+
     if (user?.discordId) {
+      for (const swap of createdSwaps) {
+        const participant = await findParticipantByDiscord(swap.id, user.discordId);
+        if (participant) await addJoined(swap, participant.id);
+      }
       try {
-        joined = await findSwapsByDiscordParticipant(user.discordId);
+        const others = await findSwapsByDiscordParticipant(user.discordId);
+        for (const swap of others) await addJoined(swap, swap.participantId);
       } catch (err) {
         request.log.error({ err }, "failed to load joined swaps");
       }
     }
 
-    const createdIds = new Set(created.map((s) => s.id));
-    const swaps = [
-      ...created.map((s) => ({
-        id: s.id,
-        code: s.code,
-        title: s.title,
-        status: s.status,
-        startDate: s.startDate,
-        giftDeadline: s.giftDeadline,
-        participantCount: s.participantCount,
-        autoMatch: s.autoMatch,
-        role: "creator" as const,
-      })),
-      ...joined
-        .filter((s) => !createdIds.has(s.id))
-        .map((s) => ({
-          id: s.id,
-          code: s.code,
-          title: s.title,
-          status: s.status,
-          startDate: s.startDate,
-          giftDeadline: s.giftDeadline,
-          participantCount: s.participantCount,
-          autoMatch: s.autoMatch,
-          role: "participant" as const,
-        })),
-    ].sort(
-      (a, b) =>
-        new Date(b.startDate).getTime() - new Date(a.startDate).getTime(),
+    joined.sort(
+      (a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime(),
     );
 
-    return { swaps };
+    return {
+      created: createdSwaps.map(swapListItem),
+      joined,
+    };
   });
 
   app.post("/swaps", async (request) => {
@@ -308,6 +401,7 @@ export async function swapRoutes(app: FastifyInstance) {
         id: p.id,
         firstName: p.firstName,
         steamUsername: p.steamUsername,
+        steamProfileUrl: steamProfileUrl(p.steamId, p.steamUsername),
         discordTag: p.discordTag,
         hasDiscord: !!p.discordUserId,
         wishlistCount: p.wishlistItems.length,
@@ -330,6 +424,7 @@ export async function swapRoutes(app: FastifyInstance) {
               sentAt: a.sentAt,
             }))
           : null,
+      viewer: await viewerInSwap(request, full),
     };
   });
 
@@ -451,7 +546,6 @@ export async function swapRoutes(app: FastifyInstance) {
         buildSignupDm({
           swapTitle: swap.title,
           code: swap.code,
-          discordInviteUrl: swap.discordInviteUrl ?? config.discord.botInviteUrl,
         }),
       );
     }
@@ -503,7 +597,7 @@ export async function swapRoutes(app: FastifyInstance) {
     return { ok: true, code: swap.code };
   });
 
-  app.get("/swaps/:code/me", async (request) => {
+  app.get("/swaps/:code/me", async (request, reply) => {
     const { code } = request.params as { code: string };
     const swap = await findSwapByCode(code);
     if (!swap) {
@@ -512,7 +606,7 @@ export async function swapRoutes(app: FastifyInstance) {
       throw err;
     }
 
-    const participant = await requireParticipantForSwap(request, swap.id);
+    const participant = await requireParticipantForSwap(request, swap.id, reply);
     const wishlist = await listWishlist(swap.id, participant.id);
 
     return {
@@ -537,7 +631,7 @@ export async function swapRoutes(app: FastifyInstance) {
     };
   });
 
-  app.patch("/swaps/:code/me", async (request) => {
+  app.patch("/swaps/:code/me", async (request, reply) => {
     const { code } = request.params as { code: string };
     const body = updateParticipantSchema.parse(request.body);
     const swap = await findSwapByCode(code);
@@ -547,7 +641,7 @@ export async function swapRoutes(app: FastifyInstance) {
       throw err;
     }
 
-    const participant = await requireParticipantForSwap(request, swap.id);
+    const participant = await requireParticipantForSwap(request, swap.id, reply);
     const patch: Parameters<typeof updateParticipant>[2] = {};
 
     if (body.firstName) patch.firstName = body.firstName;
@@ -564,7 +658,7 @@ export async function swapRoutes(app: FastifyInstance) {
     return { participant: updated };
   });
 
-  app.put("/swaps/:code/me/wishlist", async (request) => {
+  app.put("/swaps/:code/me/wishlist", async (request, reply) => {
     const { code } = request.params as { code: string };
     const body = wishlistUpdateSchema.parse(request.body);
     const swap = await findSwapByCode(code);
@@ -574,7 +668,7 @@ export async function swapRoutes(app: FastifyInstance) {
       throw err;
     }
 
-    const participant = await requireParticipantForSwap(request, swap.id);
+    const participant = await requireParticipantForSwap(request, swap.id, reply);
     const wishlist = await replaceWishlist(
       swap.id,
       participant.id,
@@ -590,7 +684,7 @@ export async function swapRoutes(app: FastifyInstance) {
     return { wishlist };
   });
 
-  app.get("/swaps/:code/my-assignment", async (request) => {
+  app.get("/swaps/:code/my-assignment", async (request, reply) => {
     const { code } = request.params as { code: string };
     const swap = await findSwapByCode(code);
     if (!swap) {
@@ -602,7 +696,7 @@ export async function swapRoutes(app: FastifyInstance) {
       return { assignment: null };
     }
 
-    const participant = await requireParticipantForSwap(request, swap.id);
+    const participant = await requireParticipantForSwap(request, swap.id, reply);
     const assignment = await findAssignmentByGiver(swap.id, participant.id);
 
     if (!assignment) {
@@ -631,7 +725,7 @@ export async function swapRoutes(app: FastifyInstance) {
     };
   });
 
-  app.post("/swaps/:code/mark-sent", async (request) => {
+  app.post("/swaps/:code/mark-sent", async (request, reply) => {
     const { code } = request.params as { code: string };
     const swap = await findSwapByCode(code);
     if (!swap || swap.status !== "matched") {
@@ -640,7 +734,7 @@ export async function swapRoutes(app: FastifyInstance) {
       throw err;
     }
 
-    const participant = await requireParticipantForSwap(request, swap.id);
+    const participant = await requireParticipantForSwap(request, swap.id, reply);
     const assignment = await updateAssignmentSent(swap.id, participant.id, new Date());
     return { sentAt: assignment.sentAt };
   });

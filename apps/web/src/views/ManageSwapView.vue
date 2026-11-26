@@ -12,10 +12,17 @@ type Participant = {
   id: string;
   firstName: string;
   steamUsername: string;
+  steamProfileUrl?: string;
   discordTag: string | null;
   hasDiscord: boolean;
   wishlistCount: number;
   giftSent: string | null;
+};
+
+type MatchLink = {
+  firstName: string;
+  steamUsername: string;
+  steamProfileUrl: string;
 };
 
 type Assignment = {
@@ -43,6 +50,7 @@ const data = ref<{
   blackouts: Array<{ id: string; participantAId: string; participantBId: string }>;
   matchingPossible: boolean;
   assignments: Assignment[] | null;
+  viewer?: { participantId: string | null; match: MatchLink | null };
 } | null>(null);
 const error = ref("");
 const blackoutA = ref("");
@@ -210,6 +218,7 @@ const matchRows = computed(() => {
       giverName: giver?.firstName ?? a.giverId,
       receiverName: receiver?.firstName ?? a.receiverId,
       receiverSteam: receiver?.steamUsername ?? "—",
+      receiverProfileUrl: receiver?.steamProfileUrl ?? null,
       receiverDiscord: receiver?.discordTag ?? null,
       sentAt: a.sentAt ?? giver?.giftSent ?? null,
     };
@@ -305,6 +314,37 @@ const canRunMatch = computed(() => {
       Auto-match is scheduled for the match time. You can run it now instead.
     </p>
 
+    <section
+      v-if="data.viewer?.participantId"
+      class="p-4 rounded-xl border border-steam/30 bg-steam/5 space-y-3"
+    >
+      <h2 class="font-display text-lg font-semibold">Your spot in this swap</h2>
+      <p v-if="data.viewer.match" class="text-slate-300">
+        You're gifting for <strong>{{ data.viewer.match.firstName }}</strong>
+        ({{ data.viewer.match.steamUsername }}).
+      </p>
+      <p v-else class="text-slate-400 text-sm">
+        You're signed up. Open your page to edit your wishlist.
+      </p>
+      <div class="flex flex-wrap gap-3">
+        <RouterLink
+          :to="`/s/${code}/me`"
+          class="px-3 py-1.5 rounded bg-steam text-slate-950 text-sm font-semibold"
+        >
+          My page
+        </RouterLink>
+        <a
+          v-if="data.viewer.match"
+          :href="data.viewer.match.steamProfileUrl"
+          target="_blank"
+          rel="noopener"
+          class="px-3 py-1.5 rounded border border-steam/40 text-steam text-sm font-semibold"
+        >
+          Match profile
+        </a>
+      </div>
+    </section>
+
     <p v-if="matchError" class="text-red-400 text-sm">{{ matchError }}</p>
     <p v-if="actionError" class="text-red-400 text-sm">{{ actionError }}</p>
 
@@ -367,7 +407,18 @@ const canRunMatch = computed(() => {
             <td class="py-2 font-medium">{{ row.giverName }}</td>
             <td class="py-2 text-steam">→</td>
             <td class="py-2 font-medium">{{ row.receiverName }}</td>
-            <td class="py-2 text-slate-400">{{ row.receiverSteam }}</td>
+            <td class="py-2 text-slate-400">
+              <a
+                v-if="row.receiverProfileUrl"
+                :href="row.receiverProfileUrl"
+                target="_blank"
+                rel="noopener"
+                class="text-steam hover:underline"
+              >
+                {{ row.receiverSteam }}
+              </a>
+              <span v-else>{{ row.receiverSteam }}</span>
+            </td>
             <td class="py-2 text-slate-400">{{ row.receiverDiscord || "—" }}</td>
             <td class="py-2">{{ row.sentAt ? "✓" : "—" }}</td>
           </tr>
