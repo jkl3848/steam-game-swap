@@ -70,7 +70,7 @@ describe("DashboardView", () => {
     expect(inSection).toContain("The one I made");
     expect(inSection).toContain("A friend's swap");
     expect(inSection).toContain("My page");
-    expect(inSection).toContain("Match profile");
+    expect(inSection).toContain("Open Steam profile");
     expect(madeSection).toContain("The one I made");
     expect(madeSection).toContain("Manage");
     expect(madeSection).not.toContain("A friend's swap");

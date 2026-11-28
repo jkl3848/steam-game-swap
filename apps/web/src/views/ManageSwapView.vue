@@ -340,7 +340,7 @@ const canRunMatch = computed(() => {
           rel="noopener"
           class="px-3 py-1.5 rounded border border-steam/40 text-steam text-sm font-semibold"
         >
-          Match profile
+          Open Steam profile
         </a>
       </div>
     </section>
