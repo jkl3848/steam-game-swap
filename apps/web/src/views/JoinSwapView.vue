@@ -34,9 +34,7 @@ const devTools = computed(() => !!config.value?.devTools);
 const canShowJoinForm = computed(
   () => discordConnected.value || (devTools.value && !loadingMe.value),
 );
-const discordInviteUrl = computed(
-  () => swapInfo.value?.discordInviteUrl || config.value?.botInviteUrl || null,
-);
+const discordInviteUrl = computed(() => swapInfo.value?.discordInviteUrl || null);
 
 onMounted(async () => {
   const [cfg] = await Promise.all([
@@ -146,8 +144,10 @@ function goToMyPage() {
       <section class="p-4 rounded-xl border border-[#5865F2]/30 bg-[#5865F2]/5 space-y-2">
         <h2 class="font-semibold text-sm">Discord required</h2>
         <p class="text-slate-400 text-xs">
-          Sign in with Discord to join. We'll remember you for 30 days in this browser.
-          Join the swap's Discord server so the bot can DM you when matches are ready.
+          Sign in with Discord to join. This browser keeps you signed in for 30 days.
+          <template v-if="discordInviteUrl">
+            Join the swap's Discord server so the bot can DM you when matches are ready.
+          </template>
         </p>
         <a
           v-if="discordInviteUrl"

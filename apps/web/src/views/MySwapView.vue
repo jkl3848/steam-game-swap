@@ -136,7 +136,7 @@ async function markSent() {
 
     <section v-if="page.canEditWishlist" class="space-y-4">
       <h2 class="font-display text-lg font-semibold">Your wishlist</h2>
-      <GameSearchCombobox v-model="wishlistEdit" :swap-code="code" />
+      <GameSearchCombobox v-model="wishlistEdit" />
       <button
         type="button"
         class="px-4 py-2 rounded-lg bg-steam text-slate-950 font-semibold disabled:opacity-50"

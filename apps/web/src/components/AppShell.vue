@@ -22,8 +22,7 @@ async function loadMe() {
     user.value = res.user;
     actingAs.value = res.actingAs;
   } catch {
-    user.value = null;
-    actingAs.value = null;
+    // Keep the last known Discord login. Only an explicit signed-out response clears it.
   }
 }
 

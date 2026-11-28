@@ -102,7 +102,7 @@ describe("auth plugin", () => {
     }));
     const res = await app.inject({ method: "GET", url: "/test" });
     expect(res.json()).toEqual({ hasCreator: false, hasParticipant: false });
-    expect(res.headers["cache-control"]).toBe("private");
+    expect(res.headers["cache-control"]).toBe("private, no-store");
     await app.close();
   });
 
@@ -135,6 +135,7 @@ describe("auth plugin", () => {
     const setCookie = res.headers["set-cookie"];
     const header = Array.isArray(setCookie) ? setCookie.join("\n") : String(setCookie ?? "");
     expect(header).toContain("__session=");
+    expect(header).toContain("Max-Age=2592000");
     expect(header).not.toContain("sgs_creator=");
     await app.close();
   });
@@ -154,7 +155,35 @@ describe("auth plugin", () => {
       url: "/test",
       cookies: { __session: token },
     });
+    const setCookie = res.headers["set-cookie"];
+    const header = Array.isArray(setCookie) ? setCookie.join("\n") : String(setCookie ?? "");
     expect(res.json()).toEqual({ userId: "user-1" });
+    expect(header).toContain("__session=");
+    expect(header).toContain("Max-Age=2592000");
+    await app.close();
+  });
+
+  it("clears the login cookie on logout instead of renewing it", async () => {
+    const { mergeSession, clearSessionCookie } = await import("./session.js");
+    const token = await mergeSession(undefined, { type: "creator", userId: "user-1" });
+    const app = Fastify();
+    await app.register(cookie);
+    const { authPlugin } = await import("../plugins/auth.js");
+    await authPlugin(app);
+    app.post("/out", async (_request, reply) => {
+      clearSessionCookie(reply);
+      return { ok: true };
+    });
+    const res = await app.inject({
+      method: "POST",
+      url: "/out",
+      cookies: { __session: token },
+    });
+    const setCookie = res.headers["set-cookie"];
+    const header = Array.isArray(setCookie) ? setCookie.join("\n") : String(setCookie ?? "");
+    expect(header).toContain("__session=");
+    expect(header).toContain("Max-Age=0");
+    expect(header).not.toContain("Max-Age=2592000");
     await app.close();
   });
 });

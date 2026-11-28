@@ -21,20 +21,20 @@ const router = createRouter({
 });
 
 router.beforeEach(async (to) => {
-  let user: unknown = null;
   try {
     const res = await api.get<{ user: unknown }>("/api/auth/me");
-    user = res.user;
+    const user = res.user;
+
+    if (to.name === "home" && user && to.query.login !== "1" && !to.query.error) {
+      return { name: "dashboard" };
+    }
+
+    if (to.meta.auth && !user) {
+      return { name: "home", query: { login: "1" } };
+    }
   } catch {
-    user = null;
-  }
-
-  if (to.name === "home" && user && to.query.login !== "1" && !to.query.error) {
-    return { name: "dashboard" };
-  }
-
-  if (to.meta.auth && !user) {
-    return { name: "home", query: { login: "1" } };
+    // A failed session check is not a logout. Sending them to sign in again
+    // would drop a still-valid 30-day cookie on a blip or a cached error.
   }
 
   return true;

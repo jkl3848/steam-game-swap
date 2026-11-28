@@ -22,6 +22,9 @@ export type SessionPayload = CreatorSession | ParticipantSession;
  * Firebase Hosting only forwards a cookie named `__session` to Cloud Functions.
  * Creator + participant claims share that one cookie.
  */
+/** Discord login and swap participation share this cookie for 30 days. */
+export const SESSION_MAX_AGE_SEC = 60 * 60 * 24 * 30;
+
 export const COOKIE_SESSION = "__session";
 /** @deprecated Hosting strips this name; kept only to clear old cookies. */
 export const COOKIE_CREATOR = "sgs_creator";
@@ -42,7 +45,7 @@ export async function signCombinedSession(session: CombinedSession): Promise<str
   return new SignJWT({ ...session })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("30d")
+    .setExpirationTime(`${SESSION_MAX_AGE_SEC}s`)
     .sign(secret());
 }
 
@@ -96,7 +99,7 @@ export async function sessionsFromToken(token: string | undefined): Promise<{
   };
 }
 
-export function cookieOptions(maxAgeSec = 60 * 60 * 24 * 30) {
+export function cookieOptions(maxAgeSec = SESSION_MAX_AGE_SEC) {
   return {
     httpOnly: true,
     secure: config.isProd,
@@ -144,6 +147,19 @@ export async function clearParticipantCookie(request: FastifyRequest, reply: Fas
     return;
   }
   reply.setCookie(COOKIE_SESSION, token, cookieOptions());
+}
+
+/**
+ * Write the current login again with a fresh 30-day lifetime.
+ * The Discord return trip is a cross-site redirect, and browsers sometimes
+ * drop cookies set only on that response. Renewing it on later same-site
+ * requests keeps the login.
+ */
+export async function refreshSessionCookie(request: FastifyRequest, reply: FastifyReply) {
+  const existing = await readCombinedSession(sessionCookieFromRequest(request) ?? "");
+  if (!existing) return;
+  reply.header("Cache-Control", "private, no-store");
+  reply.setCookie(COOKIE_SESSION, await signCombinedSession(existing), cookieOptions());
 }
 
 export async function setSessionCookie(
