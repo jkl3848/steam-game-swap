@@ -14,3 +14,16 @@ export function priceOrUndefined(value: unknown): number | undefined {
   if (!Number.isFinite(n)) return undefined;
   return Math.trunc(n);
 }
+
+/** Wording for a gift budget: a range, a minimum, or a maximum. */
+export function formatGiftPrice(
+  priceMin: number | null | undefined,
+  priceMax: number | null | undefined,
+): string | null {
+  if (priceMin != null && priceMax != null) {
+    return `Price range: $${priceMin} – $${priceMax}`;
+  }
+  if (priceMin != null) return `$${priceMin} and up`;
+  if (priceMax != null) return `less than $${priceMax}`;
+  return null;
+}

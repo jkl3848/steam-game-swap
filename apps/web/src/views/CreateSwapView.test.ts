@@ -76,6 +76,25 @@ describe("CreateSwapView", () => {
     expect(payload.giftDeadline).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 
+  it("creates a swap without a discord server link", async () => {
+    const wrapper = await mountForm();
+    await wrapper.find("input:not([type])").setValue("Friday swap");
+    const datetimeInputs = wrapper.findAll('input[type="datetime-local"]');
+    await datetimeInputs[0]!.setValue("2026-12-01T15:00");
+    await datetimeInputs[1]!.setValue("2026-12-20T18:00");
+
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+
+    expect(post).toHaveBeenCalledWith(
+      "/api/swaps",
+      expect.objectContaining({
+        title: "Friday swap",
+        discordInviteUrl: undefined,
+      }),
+    );
+  });
+
   it("omits blank prices", async () => {
     const wrapper = await mountForm();
     await fillRequired(wrapper);

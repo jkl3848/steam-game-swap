@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   COOKIE_SESSION,
+  cookieOptions,
   mergeSession,
   readCombinedSession,
+  SESSION_MAX_AGE_SEC,
   sessionsFromToken,
   signCombinedSession,
   withoutParticipant,
@@ -11,6 +13,13 @@ import {
 describe("session cookie", () => {
   it("uses the Firebase Hosting __session cookie name", () => {
     expect(COOKIE_SESSION).toBe("__session");
+  });
+
+  it("keeps the Discord login for 30 days", () => {
+    expect(SESSION_MAX_AGE_SEC).toBe(60 * 60 * 24 * 30);
+    expect(cookieOptions().maxAge).toBe(SESSION_MAX_AGE_SEC);
+    expect(cookieOptions().httpOnly).toBe(true);
+    expect(cookieOptions().path).toBe("/");
   });
 
   it("round-trips a creator session", async () => {

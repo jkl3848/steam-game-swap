@@ -17,7 +17,12 @@ export const createSwapSchema = z.object({
   priceMin: optionalPrice,
   priceMax: optionalPrice,
   autoMatch: z.boolean().default(true),
-  discordInviteUrl: z.string().url().max(500),
+  discordInviteUrl: z.preprocess((value) => {
+    if (value === null || value === undefined) return undefined;
+    if (typeof value === "string" && value.trim() === "") return undefined;
+    if (typeof value === "string") return value.trim();
+    return value;
+  }, z.string().url().max(500).optional()),
   timeZone: z.string().min(1).max(100).optional(),
 });
 

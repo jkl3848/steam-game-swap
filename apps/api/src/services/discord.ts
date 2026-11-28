@@ -62,6 +62,18 @@ export async function sendDirectMessage(
   }
 }
 
+function giftPriceLine(
+  priceMin: number | null | undefined,
+  priceMax: number | null | undefined,
+): string | null {
+  if (priceMin != null && priceMax != null) {
+    return `**Price range:** $${priceMin} – $${priceMax}`;
+  }
+  if (priceMin != null) return `**$${priceMin} and up**`;
+  if (priceMax != null) return `**less than $${priceMax}**`;
+  return null;
+}
+
 export function steamProfileUrl(steamId: string | null | undefined, steamUsername: string): string {
   if (steamId && /^\d{17}$/.test(steamId)) {
     return `https://steamcommunity.com/profiles/${steamId}`;
@@ -90,11 +102,8 @@ export function buildMatchDm(params: {
     lines.push(`Discord: ${params.discordTag}`);
   }
 
-  if (params.priceMin != null || params.priceMax != null) {
-    const min = params.priceMin != null ? `$${params.priceMin}` : "—";
-    const max = params.priceMax != null ? `$${params.priceMax}` : "—";
-    lines.push(``, `**Price range:** ${min} – ${max}`);
-  }
+  const priceLine = giftPriceLine(params.priceMin, params.priceMax);
+  if (priceLine) lines.push(``, priceLine);
 
   lines.push(
     ``,

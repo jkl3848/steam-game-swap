@@ -42,6 +42,34 @@ describe("buildMatchDm", () => {
     expect(dm).toContain("**Price range:** $10 – $30");
     expect(dm).not.toContain("**Wishlist:**");
   });
+
+  it("says and up when only a minimum price is set", () => {
+    const dm = buildMatchDm({
+      swapTitle: "Holiday Swap",
+      gifteeFirstName: "Alex",
+      steamUsername: "alex_steam",
+      steamProfileUrl: "https://steamcommunity.com/id/alex_steam",
+      priceMin: 15,
+      priceMax: null,
+      myPageUrl: "https://example.com/s/ABCD12/me",
+    });
+    expect(dm).toContain("**$15 and up**");
+    expect(dm).not.toContain("Price range");
+  });
+
+  it("says less than when only a maximum price is set", () => {
+    const dm = buildMatchDm({
+      swapTitle: "Holiday Swap",
+      gifteeFirstName: "Alex",
+      steamUsername: "alex_steam",
+      steamProfileUrl: "https://steamcommunity.com/id/alex_steam",
+      priceMin: null,
+      priceMax: 30,
+      myPageUrl: "https://example.com/s/ABCD12/me",
+    });
+    expect(dm).toContain("**less than $30**");
+    expect(dm).not.toContain("Price range");
+  });
 });
 
 describe("buildSignupDm", () => {

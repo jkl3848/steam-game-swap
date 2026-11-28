@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { findUserById } from "../db/users.js";
 import { findSwapByCode, findParticipant, findParticipantByDiscord } from "../db/swaps.js";
 import {
+  refreshSessionCookie,
   setSessionCookie,
   sessionCookieFromRequest,
   sessionsFromToken,
@@ -21,13 +22,16 @@ export async function authPlugin(app: FastifyInstance) {
   app.decorateRequest("participantSession", undefined);
 
   app.addHook("onSend", async (_request, reply) => {
-    reply.header("Cache-Control", "private");
+    reply.header("Cache-Control", "private, no-store");
   });
 
-  app.addHook("preHandler", async (request) => {
+  app.addHook("preHandler", async (request, reply) => {
     const { creator, participant } = await sessionsFromToken(sessionCookieFromRequest(request));
     if (creator) request.creatorSession = creator;
     if (participant) request.participantSession = participant;
+    if (creator || participant) {
+      await refreshSessionCookie(request, reply);
+    }
   });
 }
 

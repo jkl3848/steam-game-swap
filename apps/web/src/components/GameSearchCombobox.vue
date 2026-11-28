@@ -11,14 +11,11 @@ export type WishlistGame = {
 
 const props = defineProps<{
   modelValue: WishlistGame[];
-  swapCode?: string;
 }>();
 const emit = defineEmits<{ "update:modelValue": [WishlistGame[]] }>();
 
 const query = ref("");
 const results = ref<WishlistGame[]>([]);
-const loading = ref(false);
-const importError = ref("");
 let debounce: ReturnType<typeof setTimeout>;
 
 watch(query, (q) => {
@@ -28,15 +25,10 @@ watch(query, (q) => {
     return;
   }
   debounce = setTimeout(async () => {
-    loading.value = true;
-    try {
-      const res = await api.get<{ results: WishlistGame[] }>(
-        `/api/steam/search?q=${encodeURIComponent(q)}`,
-      );
-      results.value = res.results;
-    } finally {
-      loading.value = false;
-    }
+    const res = await api.get<{ results: WishlistGame[] }>(
+      `/api/steam/search?q=${encodeURIComponent(q)}`,
+    );
+    results.value = res.results;
   }, 300);
 });
 
@@ -53,51 +45,16 @@ function remove(appId: number) {
     props.modelValue.filter((g) => g.steamAppId !== appId),
   );
 }
-
-async function importWishlist() {
-  if (!props.swapCode) return;
-  loading.value = true;
-  importError.value = "";
-  try {
-    const res = await api.post<{ items: WishlistGame[] }>(
-      `/api/swaps/${props.swapCode}/me/wishlist/import`,
-    );
-    const merged = [...props.modelValue];
-    for (const item of res.items ?? []) {
-      if (!merged.some((g) => g.steamAppId === item.steamAppId)) {
-        merged.push(item);
-      }
-    }
-    emit("update:modelValue", merged.slice(0, 500));
-  } catch (e) {
-    importError.value =
-      e instanceof Error ? e.message : "Could not import wishlist. Search for games instead.";
-  } finally {
-    loading.value = false;
-  }
-}
 </script>
 
 <template>
   <div class="space-y-3">
-    <div class="flex gap-2">
-      <input
-        v-model="query"
-        type="search"
-        placeholder="Search Steam store..."
-        class="flex-1 px-3 py-2 rounded-lg bg-slate-900 border border-white/10 focus:border-steam focus:outline-none"
-      />
-      <button
-        v-if="swapCode"
-        type="button"
-        class="px-3 py-2 rounded-lg border border-white/10 text-sm text-slate-400 hover:text-white hover:border-steam/50 transition"
-        :disabled="loading"
-        @click="importWishlist"
-      >
-        Import wishlist
-      </button>
-    </div>
-    <p v-if="importError" class="text-red-400 text-sm">{{ importError }}</p>
+    <input
+      v-model="query"
+      type="search"
+      placeholder="Search Steam store..."
+      class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 focus:border-steam focus:outline-none"
+    />
     <ul
       v-if="results.length"
       class="rounded-lg border border-white/10 bg-slate-900 divide-y divide-white/5 max-h-48 overflow-auto"

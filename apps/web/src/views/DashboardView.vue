@@ -97,7 +97,7 @@ onMounted(async () => {
                 rel="noopener"
                 class="text-sm text-steam hover:underline"
               >
-                Match profile
+                Open Steam profile
               </a>
             </div>
           </li>

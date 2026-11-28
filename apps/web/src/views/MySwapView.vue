@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
 import { api } from "../api";
+import { formatGiftPrice } from "../lib/price";
 import GameSearchCombobox, { type WishlistGame } from "../components/GameSearchCombobox.vue";
 import StatusBadge from "../components/StatusBadge.vue";
 
@@ -29,6 +30,11 @@ const assignment = ref<{
   priceMax: number | null;
 } | null>(null);
 
+const giftPrice = computed(() =>
+  assignment.value
+    ? formatGiftPrice(assignment.value.priceMin, assignment.value.priceMax)
+    : null,
+);
 const wishlistEdit = ref<WishlistGame[]>([]);
 const saving = ref(false);
 const error = ref("");
@@ -98,18 +104,13 @@ async function markSent() {
         rel="noopener"
         class="inline-block px-4 py-2 rounded-lg bg-steam text-slate-950 font-semibold"
       >
-        Open match profile
+        Open Steam profile
       </a>
       <ol class="list-decimal list-inside text-sm text-slate-300 space-y-1">
         <li>Friend them on Steam using their profile link</li>
         <li>Send the gift through Steam once they accept</li>
       </ol>
-      <p
-        v-if="assignment.priceMin != null || assignment.priceMax != null"
-        class="text-slate-400 text-sm"
-      >
-        Price range: ${{ assignment.priceMin ?? "—" }} – ${{ assignment.priceMax ?? "—" }}
-      </p>
+      <p v-if="giftPrice" class="text-slate-400 text-sm">{{ giftPrice }}</p>
       <h3 class="font-semibold text-sm text-slate-400">Wishlist</h3>
       <ul class="space-y-2">
         <li v-for="game in assignment.wishlist" :key="game.steamAppId">
@@ -136,7 +137,7 @@ async function markSent() {
 
     <section v-if="page.canEditWishlist" class="space-y-4">
       <h2 class="font-display text-lg font-semibold">Your wishlist</h2>
-      <GameSearchCombobox v-model="wishlistEdit" :swap-code="code" />
+      <GameSearchCombobox v-model="wishlistEdit" />
       <button
         type="button"
         class="px-4 py-2 rounded-lg bg-steam text-slate-950 font-semibold disabled:opacity-50"

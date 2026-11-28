@@ -64,6 +64,22 @@ describe("create swap request", () => {
     expect(parsed.priceMax).toBe(40);
   });
 
+  it("allows a swap without a discord server link", () => {
+    const blank = createSwapSchema.parse({
+      title: "Friday swap",
+      startDate: "2026-12-01",
+      giftDeadline: "2026-12-20",
+      discordInviteUrl: "  ",
+    });
+    const omitted = createSwapSchema.parse({
+      title: "Friday swap",
+      startDate: "2026-12-01",
+      giftDeadline: "2026-12-20",
+    });
+    expect(blank.discordInviteUrl).toBeUndefined();
+    expect(omitted.discordInviteUrl).toBeUndefined();
+  });
+
   it("allows omitted prices", () => {
     const parsed = createSwapSchema.parse({
       title: "Friday swap",

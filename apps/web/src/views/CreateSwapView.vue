@@ -34,10 +34,6 @@ async function submit() {
     error.value = "Set a match date and a gift deadline.";
     return;
   }
-  if (!form.value.discordInviteUrl.trim()) {
-    error.value = "Add a Discord server invite link.";
-    return;
-  }
 
   submitting.value = true;
   try {
@@ -49,7 +45,7 @@ async function submit() {
       priceMin: priceOrUndefined(form.value.priceMin),
       priceMax: priceOrUndefined(form.value.priceMax),
       autoMatch: form.value.autoMatch,
-      discordInviteUrl: form.value.discordInviteUrl.trim(),
+      discordInviteUrl: form.value.discordInviteUrl.trim() || undefined,
       timeZone: localTz,
     });
     router.push(`/swap/${res.swap.code}/manage`);
@@ -75,14 +71,16 @@ async function submit() {
         <textarea v-model="form.rulesText" rows="3" class="input" />
       </label>
       <label class="block space-y-1">
-        <span class="text-sm text-slate-400">Discord server invite link</span>
+        <span class="text-sm text-slate-400">Discord server invite link (optional)</span>
         <input
           v-model="form.discordInviteUrl"
           type="url"
           class="input"
           placeholder="https://discord.gg/..."
         />
-        <span class="text-xs text-slate-500">Participants will use this link to join your server for DMs.</span>
+        <span class="text-xs text-slate-500">
+          Add this if you want participants to join your Discord server.
+        </span>
       </label>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <label class="block space-y-1">
